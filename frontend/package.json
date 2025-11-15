@@ -1,0 +1,24 @@
+{
+  "name": "foundit",
+  "version": "1.0.0",
+  "description": "AI-Powered Desktop File Search",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "search",
+    "ai",
+    "desktop"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

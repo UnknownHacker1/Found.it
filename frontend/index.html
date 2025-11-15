@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundit - AI File Search</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="icon">🔍</span>
+                    Foundit
+                </h1>
+                <p class="app-subtitle">AI-Powered Semantic File Search</p>
+            </div>
+            <div class="status-bar">
+                <span id="backend-status" class="status-indicator">
+                    <span class="dot offline"></span>
+                    Connecting...
+                </span>
+                <span id="index-status" class="status-text">
+                    No files indexed
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Index Section -->
+            <section class="index-section">
+                <div class="section-header">
+                    <h2>Index Your Files</h2>
+                    <p>Select a folder to start indexing files for AI search</p>
+                </div>
+                <div class="index-controls">
+                    <button id="select-folder-btn" class="btn btn-primary">
+                        Select Folder to Index
+                    </button>
+                    <button id="quick-index-btn" class="btn btn-secondary">
+                        Quick Index Desktop
+                    </button>
+                    <button id="clear-index-btn" class="btn btn-danger">
+                        Clear Index
+                    </button>
+                </div>
+                <div id="index-progress" class="progress-section hidden">
+                    <div class="progress-info">
+                        <span id="progress-text">Indexing files...</span>
+                        <span id="progress-stats"></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search Section -->
+            <section class="search-section">
+                <div class="search-box">
+                    <input
+                        type="text"
+                        id="search-input"
+                        class="search-input"
+                        placeholder="Search for anything... (e.g., 'Math homework', 'Python code', 'Meeting notes')"
+                        autocomplete="off"
+                    >
+                    <button id="search-btn" class="search-btn">Search</button>
+                </div>
+                <div id="search-help" class="search-help">
+                    <p><strong>How it works:</strong> Foundit uses AI to understand what you're looking for and finds files with similar content - not just matching keywords!</p>
+                    <p><strong>Try:</strong> "calculus assignments", "javascript tutorials", "project ideas"</p>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section" class="results-section hidden">
+                <div class="results-header">
+                    <h3 id="results-title">Search Results</h3>
+                    <span id="results-count" class="results-count"></span>
+                </div>
+                <div id="results-container" class="results-container">
+                    <!-- Results will be dynamically added here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

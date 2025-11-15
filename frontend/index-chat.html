@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundit - AI File Assistant</title>
+    <link rel="stylesheet" href="styles-chat.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="app-title">
+                    <span class="icon">🔍</span>
+                    Foundit
+                </h1>
+                <p class="app-subtitle">AI File Assistant</p>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- Status Section -->
+                <div class="status-section">
+                    <div class="status-item">
+                        <span id="backend-status" class="status-indicator">
+                            <span class="dot offline"></span>
+                            Connecting...
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span id="rag-status" class="status-indicator">
+                            <span class="dot offline"></span>
+                            AI: Loading...
+                        </span>
+                    </div>
+                    <div class="status-item">
+                        <span id="index-status" class="status-text">
+                            No files indexed
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Index Controls -->
+                <div class="index-section">
+                    <h3>Index Files</h3>
+                    <button id="select-folder-btn" class="btn btn-secondary btn-sm">
+                        Select Folder
+                    </button>
+                    <button id="quick-index-btn" class="btn btn-secondary btn-sm">
+                        Index Desktop
+                    </button>
+                    <div id="index-progress" class="progress-section hidden">
+                        <div class="progress-info">
+                            <span id="progress-text" class="small-text">Indexing...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="actions-section">
+                    <button id="clear-conversation-btn" class="btn btn-ghost btn-sm">
+                        Clear Chat
+                    </button>
+                    <button id="clear-index-btn" class="btn btn-ghost btn-sm">
+                        Clear Index
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <p class="small-text">Powered by Ollama + Llama 3.1</p>
+                <p class="small-text">100% Local & Private</p>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <!-- Chat Header -->
+            <header class="chat-header">
+                <h2>Chat with Your Files</h2>
+                <p class="subtitle">Ask me anything about your documents</p>
+            </header>
+
+            <!-- Messages Area -->
+            <div id="chat-messages" class="chat-messages">
+                <!-- Welcome Message -->
+                <div class="message assistant-message">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <div class="message-text">
+                            <p>Hi! I'm your AI file assistant. I can help you find files by understanding what you're looking for.</p>
+                            <p>Try asking:</p>
+                            <ul>
+                                <li>"Find my resume"</li>
+                                <li>"Show me travel documents"</li>
+                                <li>"Where are my Q3 budget files?"</li>
+                                <li>"Find Python code related to API"</li>
+                            </ul>
+                            <p class="small-text">First, make sure to index your files using the sidebar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea
+                        id="chat-input"
+                        class="chat-input"
+                        placeholder="Ask me to find files... (e.g., 'Find my resume')"
+                        rows="1"
+                    ></textarea>
+                    <button id="send-btn" class="send-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 10l16-8-8 16-2-8-6-2z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="input-hint">
+                    <span class="small-text">Press Enter to send, Shift+Enter for new line</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="renderer-chat.js"></script>
+</body>
+</html>
