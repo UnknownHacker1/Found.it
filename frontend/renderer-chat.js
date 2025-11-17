@@ -19,7 +19,6 @@ const clearIndexBtn = document.getElementById('clear-index-btn');
 const indexProgress = document.getElementById('index-progress');
 const progressText = document.getElementById('progress-text');
 const progressFill = document.getElementById('progress-fill');
-const cancelIndexBtn = document.getElementById('cancel-index-btn');
 const userInfoDiv = document.getElementById('user-info');
 const logoutBtn = document.getElementById('logout-btn');
 const themeToggle = document.getElementById('theme-toggle');
@@ -58,7 +57,6 @@ async function init() {
     quickIndexBtn.addEventListener('click', handleQuickIndex);
     clearConversationBtn.addEventListener('click', handleClearConversation);
     clearIndexBtn.addEventListener('click', handleClearIndex);
-    cancelIndexBtn.addEventListener('click', handleCancelIndex);
     themeToggle.addEventListener('click', toggleTheme);
     settingsBtn.addEventListener('click', openSettings);
     closeSettings.addEventListener('click', closeSettingsModal);
@@ -325,14 +323,21 @@ function getCurrentTime() {
 
 async function checkBackendStatus() {
     try {
+        // Use a shorter timeout for quick check, but don't fail if backend is busy
         const result = await ipcRenderer.invoke('check-backend');
         if (result.connected) {
             backendStatus.innerHTML = '<span class="dot online"></span> Connected';
         } else {
-            backendStatus.innerHTML = '<span class="dot offline"></span> Backend Offline';
+            // Only show offline if we're sure it's offline (not just busy)
+            // Don't update if we're currently indexing (backend might be busy)
+            if (!isIndexing) {
+                backendStatus.innerHTML = '<span class="dot offline"></span> Backend Offline';
+            }
         }
     } catch (error) {
-        backendStatus.innerHTML = '<span class="dot offline"></span> Backend Offline';
+        if (!isIndexing) {
+            backendStatus.innerHTML = '<span class="dot offline"></span> Backend Offline';
+        }
     }
 }
 
@@ -383,8 +388,49 @@ async function indexFiles(path) {
     quickIndexBtn.disabled = true;
 
     indexProgress.classList.remove('hidden');
-    progressText.textContent = 'Starting indexing... 0%';
     progressFill.style.width = '0%';
+
+    // Funny loading messages
+    const loadingMessages = [
+        '🤔 Discombobulating your file system...',
+        '🧠 Teaching AI to remember your files...',
+        '⚡ Supercharging my memory banks...',
+        '🎯 Converting files to digital dust...',
+        '🚀 Launching the indexing rocket...',
+        '🎨 Painting your files in vector colors...',
+        '🔮 Reading the tea leaves of your documents...',
+        '🎭 Convincing your files to cooperate...',
+        '🌊 Riding the wave of embeddings...',
+        '🎪 Herding digital cats...',
+        '🎸 Playing a sick beat while indexing...',
+        '🏃 Running like a cheetah on espresso...',
+        '🧩 Solving the puzzle of your data...',
+        '⭐ Making your files shine bright...',
+        '🎯 Locking and loading your content...',
+        '🌈 Painting the clouds with your data...',
+        '🎢 Taking a wild ride through your files...',
+        '🦾 Flexing computational muscles...',
+        '🎬 Producing a blockbuster index...',
+        '🌸 Blooming your data into existence...',
+        '🎺 Jazzing up your file system...',
+        '🏆 Building a champion index...',
+        '🎯 Nailing the precision strikes on files...'
+    ];
+
+    let messageIndex = 0;
+    progressText.style.transition = 'opacity 0.5s ease-in-out';
+    
+    const messageInterval = setInterval(() => {
+        // Fade out
+        progressText.style.opacity = '0.5';
+        
+        setTimeout(() => {
+            messageIndex = (messageIndex + 1) % loadingMessages.length;
+            progressText.textContent = loadingMessages[messageIndex];
+            // Fade in
+            progressText.style.opacity = '1';
+        }, 250);
+    }, 4000); // Change message every 4 seconds
 
     // Listen for progress updates
     const progressListener = (event, progress) => {
@@ -393,15 +439,23 @@ async function indexFiles(path) {
 
         if (progress.status === 'cancelled') {
             progressText.textContent = 'Cancelled';
+            clearInterval(messageInterval);
             return;
         }
 
-        if (percentage < 90) {
-            progressText.textContent = `Indexing files... ${percentage}%`;
+        // Show current file count in the message
+        const current = progress.current || 0;
+        const total = progress.total || 0;
+        
+        if (percentage <= 90) {
+            // Show funny message with file count
+            progressText.textContent = `${loadingMessages[messageIndex]} (${current}/${total})`;
         } else if (percentage < 100) {
-            progressText.textContent = `Building embeddings... ${percentage}%`;
+            progressText.textContent = `🧠 Building your AI's memory... ${percentage}%`;
         } else {
-            progressText.textContent = `Complete! 100%`;
+            progressText.style.opacity = '1';
+            progressText.textContent = `✨ Done! Your files are indexed!`;
+            clearInterval(messageInterval);
         }
     };
 
@@ -455,18 +509,7 @@ async function indexFiles(path) {
     }
 }
 
-async function handleCancelIndex() {
-    if (!isIndexing) return;
 
-    if (confirm('Are you sure you want to cancel indexing?')) {
-        try {
-            await ipcRenderer.invoke('cancel-index');
-            progressText.textContent = 'Cancelling...';
-        } catch (error) {
-            console.error('Error cancelling index:', error);
-        }
-    }
-}
 
 async function handleClearConversation() {
     if (!confirm('Clear the conversation history?')) return;

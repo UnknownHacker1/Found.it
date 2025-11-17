@@ -34,7 +34,9 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -69,7 +71,7 @@ ipcMain.handle('index-files', async (event, path, forceReindex = false) => {
       force_reindex: forceReindex
     });
 
-    // Poll for progress updates
+    // Poll for progress updates - more frequently for smooth progress bar
     const pollProgress = setInterval(async () => {
       try {
         const progressResponse = await axios.get(`${API_URL}/index-progress`);
@@ -77,7 +79,7 @@ ipcMain.handle('index-files', async (event, path, forceReindex = false) => {
       } catch (error) {
         // Ignore polling errors
       }
-    }, 500); // Poll every 500ms
+    }, 200); // Poll every 200ms for smoother updates
 
     // Wait for indexing to complete
     const response = await indexPromise;
@@ -126,7 +128,7 @@ ipcMain.handle('clear-index', async () => {
 
 ipcMain.handle('check-backend', async () => {
   try {
-    const response = await axios.get(`${API_URL}/`, { timeout: 2000 });
+    const response = await axios.get(`${API_URL}/`, { timeout: 10000 });
     return { connected: true, data: response.data };
   } catch (error) {
     return { connected: false, error: error.message };

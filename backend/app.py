@@ -529,9 +529,9 @@ def initialize_models():
 
             # Test if provider is available
             if llm_provider.is_available():
-                print("✓ OpenRouter provider initialized")
+                print("[OK] OpenRouter provider initialized")
             else:
-                print("✗ OpenRouter provider not available (check API key)")
+                print("[ERROR] OpenRouter provider not available (check API key)")
 
             rag_engine = RAGEngine(search_engine, llm_provider=llm_provider)
         else:
@@ -540,13 +540,13 @@ def initialize_models():
             rag_engine = RAGEngine(search_engine)
 
         if rag_engine and rag_engine.is_available():
-            print("✓ RAG engine ready! You can now chat with your files.")
+            print("[OK] RAG engine ready! You can now chat with your files.")
         else:
-            print("✗ Warning: RAG engine not fully available.")
+            print("[WARNING] RAG engine not fully available.")
             print("  Please set OPENROUTER_API_KEY in config.py")
             print("  Or install Ollama: https://ollama.com")
     except Exception as e:
-        print(f"✗ Error: Could not initialize RAG engine: {e}")
+        print(f"[ERROR] Could not initialize RAG engine: {e}")
         print("  Set OPENROUTER_API_KEY in backend/config.py to use OpenRouter")
         print("  Get free API key: https://openrouter.ai/keys")
         import traceback

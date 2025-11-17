@@ -51,14 +51,16 @@ async function checkOAuthStatus() {
         const data = await response.json();
 
         if (!data.oauth_enabled) {
-            loginButton.disabled = true;
-            loginButton.style.opacity = '0.5';
-            loginButton.title = 'OAuth not configured on backend';
-            showStatus('OAuth not configured. Using skip mode.', 'info');
+            // OAuth not configured - just disable Google login button
+            if (googleLoginBtn) {
+                googleLoginBtn.disabled = true;
+                googleLoginBtn.style.opacity = '0.5';
+                googleLoginBtn.title = 'OAuth not configured on backend';
+            }
         }
     } catch (error) {
         console.error('Failed to check OAuth status:', error);
-        showStatus('Backend offline. Please start the backend server.', 'error');
+        showStatus('⚠️ Backend offline. Please start the backend server first.', 'error');
     }
 }
 
