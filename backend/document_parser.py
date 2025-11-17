@@ -1,6 +1,6 @@
 """
 Document Parser - Extracts text content from various file types
-Supports: PDF, DOCX, PPTX, TXT, and code files
+Supports: PDF, DOCX, PPTX, XLSX, TXT, and 60+ code/config formats
 """
 
 from pathlib import Path
@@ -28,6 +28,13 @@ try:
 except ImportError:
     PPTX_AVAILABLE = False
 
+# Excel parsing
+try:
+    import openpyxl
+    XLSX_AVAILABLE = True
+except ImportError:
+    XLSX_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -37,17 +44,48 @@ class DocumentParser:
 
     # Text-based file extensions that can be read directly
     TEXT_EXTENSIONS = {
-        '.txt', '.md', '.log', '.csv', '.json', '.xml',
-        '.cpp', '.h', '.hpp', '.c', '.cs', '.java', '.py',
-        '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.scss',
-        '.go', '.rs', '.rb', '.php', '.sh', '.bat', '.yaml', '.yml'
+        # Documents & Notes
+        '.txt', '.md', '.markdown', '.log', '.rtf',
+
+        # Data & Config
+        '.csv', '.tsv', '.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+
+        # Code - C/C++
+        '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx',
+
+        # Code - Web
+        '.html', '.htm', '.css', '.scss', '.sass', '.less',
+        '.js', '.jsx', '.ts', '.tsx', '.vue', '.svelte',
+
+        # Code - Backend
+        '.py', '.java', '.cs', '.go', '.rs', '.rb', '.php',
+
+        # Code - Scripts
+        '.sh', '.bash', '.zsh', '.bat', '.cmd', '.ps1',
+
+        # Code - Mobile
+        '.swift', '.kt', '.kts', '.m', '.mm',
+
+        # Code - Other
+        '.sql', '.r', '.scala', '.clj', '.ex', '.exs',
+
+        # Markup & Data
+        '.tex', '.bib', '.svg', '.graphql', '.proto',
+
+        # Environment & Build
+        '.env', '.gitignore', '.dockerignore', 'Dockerfile', 'Makefile',
+        '.gradle', '.maven', '.cmake',
+
+        # Documentation
+        '.rst', '.adoc', '.textile'
     }
 
     def __init__(self):
         self.stats = {
             'pdf_support': PDF_AVAILABLE,
             'docx_support': DOCX_AVAILABLE,
-            'pptx_support': PPTX_AVAILABLE
+            'pptx_support': PPTX_AVAILABLE,
+            'xlsx_support': XLSX_AVAILABLE
         }
 
         # Log which parsers are available
@@ -55,6 +93,7 @@ class DocumentParser:
         logger.info(f"  PDF support: {'✓' if PDF_AVAILABLE else '✗ (install PyPDF2)'}")
         logger.info(f"  DOCX support: {'✓' if DOCX_AVAILABLE else '✗ (install python-docx)'}")
         logger.info(f"  PPTX support: {'✓' if PPTX_AVAILABLE else '✗ (install python-pptx)'}")
+        logger.info(f"  XLSX support: {'✓' if XLSX_AVAILABLE else '✗ (install openpyxl)'}")
 
     def can_parse(self, file_path: Path) -> bool:
         """Check if the file type is supported"""
@@ -67,6 +106,8 @@ class DocumentParser:
         if ext == '.docx' and DOCX_AVAILABLE:
             return True
         if ext == '.pptx' and PPTX_AVAILABLE:
+            return True
+        if ext == '.xlsx' and XLSX_AVAILABLE:
             return True
 
         return False
@@ -87,6 +128,8 @@ class DocumentParser:
                 return self._parse_docx(file_path)
             elif ext == '.pptx':
                 return self._parse_pptx(file_path)
+            elif ext == '.xlsx':
+                return self._parse_xlsx(file_path)
             else:
                 logger.warning(f"Unsupported file type: {ext}")
                 return None
@@ -196,6 +239,43 @@ class DocumentParser:
 
         except Exception as e:
             logger.error(f"Error parsing PPTX {file_path}: {e}")
+            return None
+
+    def _parse_xlsx(self, file_path: Path) -> Optional[str]:
+        """Extract text from Excel spreadsheets"""
+        if not XLSX_AVAILABLE:
+            logger.warning("openpyxl not installed. Cannot parse XLSX files.")
+            return None
+
+        try:
+            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            text_content = []
+
+            # Limit to first 10 sheets to prevent excessive processing
+            max_sheets = min(len(workbook.sheetnames), 10)
+
+            for sheet_name in workbook.sheetnames[:max_sheets]:
+                sheet = workbook[sheet_name]
+
+                # Add sheet name as header
+                text_content.append(f"Sheet: {sheet_name}")
+
+                # Limit to first 1000 rows to prevent excessive processing
+                max_rows = min(sheet.max_row, 1000) if sheet.max_row else 1000
+
+                for row in sheet.iter_rows(max_row=max_rows, values_only=True):
+                    # Convert row values to strings and filter out None/empty
+                    row_text = ' | '.join(str(cell) for cell in row if cell is not None and str(cell).strip())
+                    if row_text:
+                        text_content.append(row_text)
+
+            workbook.close()
+
+            result = '\n'.join(text_content)
+            return result if result.strip() else None
+
+        except Exception as e:
+            logger.error(f"Error parsing XLSX {file_path}: {e}")
             return None
 
     def get_preview(self, content: str, max_length: int = 200) -> str:

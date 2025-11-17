@@ -111,7 +111,8 @@ class RAGEngine:
 
     def _classify_intent(self, user_message: str) -> str:
         """
-        Classify user intent: file search vs general chat
+        Smart classification using vector search confidence
+        No hardcoded lists - let the AI decide based on semantic similarity
 
         Args:
             user_message: User's message
@@ -119,77 +120,43 @@ class RAGEngine:
         Returns:
             "file_search" or "general_chat"
         """
-        # Keywords that indicate file search
-        search_keywords = ["find", "search", "show", "get", "locate", "where is", "looking for", "need"]
+        # Always attempt file search - let the results determine validity
+        # This removes the need for hardcoded greetings/phrases
+        return "file_search"
 
-        message_lower = user_message.lower()
-
-        # Check if message contains search keywords
-        for keyword in search_keywords:
-            if keyword in message_lower:
-                return "file_search"
-
-        # Check for file-related words
-        if any(word in message_lower for word in ["file", "document", "pdf", "resume", "cv", "passport"]):
-            return "file_search"
-
-        # Otherwise, it's general chat (summarize, explain, help, etc.)
-        return "general_chat"
+    def _has_recent_file_results(self) -> bool:
+        """Check if recent conversation has file results"""
+        for msg in reversed(self.conversation_history[-3:]):
+            if msg.get("role") == "assistant" and msg.get("files"):
+                return True
+        return False
 
     def _handle_general_chat(self, user_message: str) -> Dict:
         """
-        Handle general chat questions (summarization, explanation, help, etc.)
+        Instant rejection - no LLM calls, just tell user to search for files
 
         Args:
             user_message: User's message
 
         Returns:
-            Dict with response
+            Dict with rejection response
         """
-        # Check if user is asking to summarize/read files from previous search
-        files_to_analyze = self._extract_files_from_context(user_message)
+        message_lower = user_message.lower().strip()
 
-        # Build context from conversation history
-        context_messages = []
-        for msg in self.conversation_history[-6:]:  # Last 3 exchanges
-            context_messages.append({
-                "role": msg["role"],
-                "content": msg["content"]
-            })
-
-        # If asking about files, fetch their content
-        file_context = ""
-        if files_to_analyze:
-            logger.info(f"Reading files for analysis: {files_to_analyze}")
-            file_context = self._get_file_contents(files_to_analyze)
-
-        # Build the final message with file context if available
-        final_message = user_message
-        if file_context:
-            final_message = f"{user_message}\n\n{file_context}"
-
-        # Add current message
-        context_messages.append({
-            "role": "user",
-            "content": final_message
-        })
-
-        try:
-            # Use LLM to respond naturally
-            response = self.llm.chat(context_messages, max_tokens=1500)
-
+        # Help message
+        if message_lower in ["help", "?", "how", "what can you do", "what can you do?"]:
             return {
-                "response": response,
+                "response": "I'm a file search assistant. Try:\n• \"find my resume\"\n• \"budget reports\"\n• \"meeting notes team C\"\n• \"photos from trip\"",
                 "files": [],
-                "reasoning": "General chat response"
+                "reasoning": "Help requested"
             }
-        except Exception as e:
-            logger.error(f"Error in general chat: {e}")
-            return {
-                "response": f"I'm having trouble responding: {str(e)}",
-                "files": [],
-                "reasoning": str(e)
-            }
+
+        # Generic rejection for non-file queries
+        return {
+            "response": "Please search for a file.",
+            "files": [],
+            "reasoning": "Not a file search query"
+        }
 
     def _extract_files_from_context(self, user_message: str) -> List[str]:
         """
@@ -280,42 +247,55 @@ class RAGEngine:
 
     def _handle_file_search(self, user_message: str, top_k: int = 5) -> Dict:
         """
-        Handle file search queries using chain-of-thought reasoning ONLY
+        Handle file search queries - FAST semantic search with confidence filtering
 
         Args:
-            user_message: User's search query
+            user_message: User's natural language search query
             top_k: Number of files to return
 
         Returns:
             Dict with response, files, and reasoning
         """
-        # Step 1: Extract comprehensive keywords using LLM
-        keywords = self._extract_keywords(user_message)
-        logger.info(f"Extracted keywords: {keywords}")
+        # Use the full natural language query for semantic search
+        search_query = user_message
 
-        # Step 2: Add hardcoded synonyms for common queries (fallback safety)
-        enhanced_keywords = self._add_synonym_fallback(keywords, user_message)
-        logger.info(f"Enhanced keywords: {enhanced_keywords}")
+        # Add synonym expansion for better recall on common terms
+        enhanced_query = self._add_synonym_fallback(search_query, user_message)
+        logger.info(f"Search query: {enhanced_query}")
 
-        # Step 3: Retrieve candidates using vector search (cast a wide net)
-        # Get top 50 candidates so LLM has many options to reason about
-        candidates = self.search_engine.search(enhanced_keywords, top_k=50)
+        # Vector search handles natural language understanding
+        candidates = self.search_engine.search(enhanced_query, top_k=top_k)
         logger.info(f"Vector search found {len(candidates)} candidates")
-        if candidates:
-            logger.info(f"Top 10 candidates: {[c['file_name'] for c in candidates[:10]]}")
 
-        # Step 4: Use LLM with VERBOSE chain-of-thought reasoning
-        # The LLM will talk through its reasoning for EVERY file
-        if candidates:
-            result = self._reason_about_files_chain_of_thought(user_message, candidates, top_k)
-        else:
-            result = {
-                "response": "I couldn't find any files matching your request. Try indexing more files or rephrasing your query.",
-                "files": [],
-                "reasoning": "No candidates found in vector search"
+        # CONFIDENCE THRESHOLD: Filter out low-confidence results
+        # Greetings like "hey how are u" will have very low similarity to any file
+        # Typical similarity scores:
+        # - Good match: 0.3-1.0
+        # - Random text/greetings: 0.0-0.2
+        CONFIDENCE_THRESHOLD = 0.25
+
+        if candidates and candidates[0].get('score', 0) >= CONFIDENCE_THRESHOLD:
+            # High confidence - these are real file matches
+            if len(candidates) == 1:
+                response = f"I found exactly what you're looking for!\n\n📄 {candidates[0]['file_name']}"
+            else:
+                response = f"I found {len(candidates)} files that match your request:\n\n"
+                for i, f in enumerate(candidates, 1):
+                    response += f"{i}. 📄 {f['file_name']}\n"
+
+            return {
+                "response": response,
+                "files": candidates,
+                "reasoning": "Semantic vector search"
             }
-
-        return result
+        else:
+            # Low confidence or no results - likely not a file search query
+            logger.info(f"Low confidence (top score: {candidates[0].get('score', 0) if candidates else 0:.3f}), treating as non-file query")
+            return {
+                "response": "Please search for a file.",
+                "files": [],
+                "reasoning": "Query has low semantic similarity to indexed files"
+            }
 
     def _generate_query_phrasings(self, user_message: str) -> List[str]:
         """
@@ -491,10 +471,12 @@ PHRASING_4: [keywords]"""
         Returns:
             Enhanced query with guaranteed synonyms
         """
-        # Common synonym mappings
+        # Common synonym mappings for better semantic search
         synonym_map = {
-            "resume": "CV curriculum vitae professional experience work history employment history career profile",
-            "cv": "resume curriculum vitae professional experience work history employment history career profile",
+            "resume": "CV curriculum vitae professional experience work history employment history career profile job application",
+            "cv": "resume curriculum vitae professional experience work history employment history career profile job application",
+            "job application": "resume CV cover letter employment application career",
+            "cover letter": "job application resume CV application letter",
             "travel": "passport visa i94 i-94 immigration arrival departure boarding pass flight ticket",
             "passport": "travel visa i94 immigration",
             "visa": "travel passport i94 immigration",
@@ -504,6 +486,8 @@ PHRASING_4: [keywords]"""
             "tax": "taxes income revenue deduction IRS W2 1040 financial",
             "invoice": "bill receipt payment charge financial",
             "contract": "agreement legal document terms conditions",
+            "meeting": "notes minutes agenda discussion call conference",
+            "notes": "meeting minutes documentation memo",
         }
 
         # Check if any synonym keys appear in original message (case insensitive)
@@ -689,11 +673,14 @@ BEGIN YOUR ANALYSIS NOW:"""
 
             # Create natural language response
             if selected_files:
-                response = f"I analyzed {min(20, len(candidates))} files and found {len(selected_files)} that match your request.\n\n{summary}\n\nSelected files:\n"
-                for i, f in enumerate(selected_files, 1):
-                    response += f"{i}. {f['file_name']}\n"
+                if len(selected_files) == 1:
+                    response = f"I found exactly what you're looking for! {summary}\n\n📄 {selected_files[0]['file_name']}"
+                else:
+                    response = f"I found {len(selected_files)} files that match your request. {summary}\n\n"
+                    for i, f in enumerate(selected_files, 1):
+                        response += f"{i}. 📄 {f['file_name']}\n"
             else:
-                response = "I couldn't find any files that match your request after analyzing the candidates."
+                response = "I couldn't find any files that match your request. Try:\n• Indexing more folders\n• Using different keywords\n• Rephrasing your search"
 
             return {
                 "response": response,

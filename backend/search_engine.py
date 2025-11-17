@@ -6,6 +6,10 @@ Uses sentence-transformers for embeddings and FAISS for vector similarity search
 from typing import List, Dict, Optional
 import numpy as np
 import logging
+import json
+import os
+import sys
+from pathlib import Path
 
 # Sentence transformers for AI embeddings
 try:
@@ -238,3 +242,106 @@ class SearchEngine:
             "embedding_dimension": self.model.get_sentence_embedding_dimension(),
             "max_sequence_length": self.model.max_seq_length
         }
+
+    def get_cache_dir(self) -> Path:
+        """Get persistent cache directory based on OS"""
+        if os.name == 'nt':  # Windows
+            base = Path(os.getenv('LOCALAPPDATA', os.path.expanduser('~\\AppData\\Local')))
+        elif sys.platform == 'darwin':  # Mac
+            base = Path.home() / 'Library' / 'Application Support'
+        else:  # Linux
+            base = Path.home() / '.local' / 'share'
+
+        cache_dir = base / 'Foundit' / 'index'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+
+    def save_index(self):
+        """Save index to disk for instant loading on restart"""
+        if self.index is None or not self.documents:
+            logger.warning("No index to save")
+            return
+
+        try:
+            cache_dir = self.get_cache_dir()
+
+            # Save FAISS index
+            faiss.write_index(self.index, str(cache_dir / 'index.faiss'))
+
+            # Save documents metadata (without content to reduce file size)
+            docs_to_save = []
+            for doc in self.documents:
+                doc_copy = doc.copy()
+                # Keep content but truncate if too large
+                if 'content' in doc_copy and len(doc_copy['content']) > 5000:
+                    doc_copy['content'] = doc_copy['content'][:5000] + '...[truncated]'
+                docs_to_save.append(doc_copy)
+
+            with open(cache_dir / 'documents.json', 'w', encoding='utf-8') as f:
+                json.dump(docs_to_save, f, ensure_ascii=False, indent=2)
+
+            # Save embeddings
+            np.save(cache_dir / 'embeddings.npy', self.embeddings)
+
+            # Save metadata (file count, last updated)
+            metadata = {
+                'file_count': len(self.documents),
+                'model_name': self.model_name,
+                'version': '1.0'
+            }
+            with open(cache_dir / 'metadata.json', 'w') as f:
+                json.dump(metadata, f, indent=2)
+
+            logger.info(f"✓ Index saved to {cache_dir} ({len(self.documents)} files)")
+
+        except Exception as e:
+            logger.error(f"Failed to save index: {e}")
+
+    def load_index(self) -> bool:
+        """Load index from disk (skip re-indexing!) - Returns True if successful"""
+        try:
+            cache_dir = self.get_cache_dir()
+
+            index_file = cache_dir / 'index.faiss'
+            docs_file = cache_dir / 'documents.json'
+            emb_file = cache_dir / 'embeddings.npy'
+            meta_file = cache_dir / 'metadata.json'
+
+            # Check if all required files exist
+            if not all([index_file.exists(), docs_file.exists(), emb_file.exists()]):
+                logger.info("No cached index found - will need to index files")
+                return False
+
+            # Load model first (needed for search)
+            if self.model is None:
+                self.load_model()
+
+            # Load FAISS index
+            self.index = faiss.read_index(str(index_file))
+
+            # Load documents
+            with open(docs_file, 'r', encoding='utf-8') as f:
+                self.documents = json.load(f)
+
+            # Load embeddings
+            self.embeddings = np.load(emb_file)
+
+            # Load metadata if exists
+            if meta_file.exists():
+                with open(meta_file, 'r') as f:
+                    metadata = json.load(f)
+                    logger.info(f"✓ Loaded cached index: {metadata.get('file_count', len(self.documents))} files")
+            else:
+                logger.info(f"✓ Loaded cached index: {len(self.documents)} files")
+
+            logger.info("Index loaded from cache (instant!) - ready to search")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load cached index: {e}")
+            logger.info("Will perform fresh indexing instead")
+            # Clear any partial state
+            self.index = None
+            self.documents = []
+            self.embeddings = None
+            return False

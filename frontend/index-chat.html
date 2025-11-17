@@ -11,11 +11,12 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1 class="app-title">
-                    <span class="icon">🔍</span>
-                    Foundit
-                </h1>
-                <p class="app-subtitle">AI File Assistant</p>
+                <div class="logo-container">
+                    <img src="../logo.png" alt="Foundit Logo" class="app-logo">
+                </div>
+                <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+                    <span class="theme-icon">☀️</span>
+                </button>
             </div>
 
             <div class="sidebar-content">
@@ -40,6 +41,44 @@
                     </div>
                 </div>
 
+                <!-- File Type Filter -->
+                <div class="filter-section">
+                    <h3>File Types</h3>
+                    <div class="filter-dropdown-wrapper">
+                        <button class="filter-dropdown-btn" id="filter-dropdown-btn">
+                            <span id="filter-selected-text">All Files</span>
+                            <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                <path d="M6 9L1 4h10L6 9z"/>
+                            </svg>
+                        </button>
+                        <div class="filter-dropdown-menu hidden" id="filter-dropdown-menu">
+                            <label class="filter-option">
+                                <input type="checkbox" value="documents" class="filter-checkbox">
+                                <span class="filter-label">Documents</span>
+                            </label>
+                            <label class="filter-option">
+                                <input type="checkbox" value="code" class="filter-checkbox">
+                                <span class="filter-label">Code</span>
+                            </label>
+                            <label class="filter-option">
+                                <input type="checkbox" value="spreadsheets" class="filter-checkbox">
+                                <span class="filter-label">Spreadsheets</span>
+                            </label>
+                            <label class="filter-option">
+                                <input type="checkbox" value="presentations" class="filter-checkbox">
+                                <span class="filter-label">Slides</span>
+                            </label>
+                            <label class="filter-option">
+                                <input type="checkbox" value="text" class="filter-checkbox">
+                                <span class="filter-label">Text</span>
+                            </label>
+                            <div class="filter-actions">
+                                <button class="filter-clear-btn" id="filter-clear-btn">Clear All</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Index Controls -->
                 <div class="index-section">
                     <h3>Index Files</h3>
@@ -52,6 +91,7 @@
                     <div id="index-progress" class="progress-section hidden">
                         <div class="progress-info">
                             <span id="progress-text" class="small-text">Indexing...</span>
+                            <button id="cancel-index-btn" class="btn-cancel-index">Cancel</button>
                         </div>
                         <div class="progress-bar">
                             <div id="progress-fill" class="progress-fill"></div>
@@ -67,11 +107,16 @@
                     <button id="clear-index-btn" class="btn btn-ghost btn-sm">
                         Clear Index
                     </button>
+                    <button id="settings-btn" class="btn btn-ghost btn-sm">
+                        ⚙️ Settings
+                    </button>
                 </div>
             </div>
 
             <div class="sidebar-footer">
-                <p class="small-text">Powered by Ollama + Llama 3.1</p>
+                <!-- User Info Section -->
+                <div id="user-info" class="user-info-section"></div>
+
                 <p class="small-text">100% Local & Private</p>
             </div>
         </aside>
@@ -80,18 +125,19 @@
         <main class="chat-container">
             <!-- Chat Header -->
             <header class="chat-header">
-                <h2>Chat with Your Files</h2>
-                <p class="subtitle">Ask me anything about your documents</p>
+                <h2>Lost it? Found.it!</h2>
+                <p class="subtitle">Find any file on your computer with natural language</p>
             </header>
 
             <!-- Messages Area -->
             <div id="chat-messages" class="chat-messages">
                 <!-- Welcome Message -->
                 <div class="message assistant-message">
-                    <div class="message-avatar">🤖</div>
+                    <div class="message-avatar">🔍</div>
                     <div class="message-content">
                         <div class="message-text">
-                            <p>Hi! I'm your AI file assistant. I can help you find files by understanding what you're looking for.</p>
+                            <p><strong>Lost it? Found.it!</strong></p>
+                            <p>I'll help you find any file on your computer using natural language.</p>
                             <p>Try asking:</p>
                             <ul>
                                 <li>"Find my resume"</li>
@@ -99,7 +145,7 @@
                                 <li>"Where are my Q3 budget files?"</li>
                                 <li>"Find Python code related to API"</li>
                             </ul>
-                            <p class="small-text">First, make sure to index your files using the sidebar.</p>
+                            <p class="small-text">First, index your files using the sidebar (only needed once!).</p>
                         </div>
                     </div>
                 </div>
@@ -111,7 +157,7 @@
                     <textarea
                         id="chat-input"
                         class="chat-input"
-                        placeholder="Ask me to find files... (e.g., 'Find my resume')"
+                        placeholder="Describe the file you're looking for... (e.g., 'Find my resume')"
                         rows="1"
                     ></textarea>
                     <button id="send-btn" class="send-btn" disabled>
@@ -125,6 +171,83 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Settings</h2>
+                <button id="close-settings" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Theme Settings -->
+                <div class="setting-group">
+                    <h3>Appearance</h3>
+                    <div class="setting-item">
+                        <label for="theme-mode">Theme Mode</label>
+                        <select id="theme-mode" class="setting-select">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                            <option value="auto">Auto (Time-based)</option>
+                        </select>
+                        <span class="setting-hint">Auto mode switches to dark after 6 PM</span>
+                    </div>
+                </div>
+
+                <!-- Search Settings -->
+                <div class="setting-group">
+                    <h3>Search</h3>
+                    <div class="setting-item">
+                        <label for="max-results">Maximum Results</label>
+                        <select id="max-results" class="setting-select">
+                            <option value="3">3 files</option>
+                            <option value="5" selected>5 files</option>
+                            <option value="10">10 files</option>
+                            <option value="20">20 files</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="show-file-previews" checked>
+                            Show file previews in results
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Performance Settings -->
+                <div class="setting-group">
+                    <h3>Performance</h3>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="auto-index" checked>
+                            Auto-index Desktop on startup
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="enable-animations" checked>
+                            Enable animations
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Privacy Settings -->
+                <div class="setting-group">
+                    <h3>Privacy</h3>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="clear-on-exit">
+                            Clear chat history on exit
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-settings" class="btn btn-primary">Save Settings</button>
+                <button id="cancel-settings" class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <script src="renderer-chat.js"></script>

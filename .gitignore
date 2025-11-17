@@ -95,3 +95,13 @@ CMakeCache.txt
 # Temporary files
 *.tmp
 *.temp
+
+# Backend local binaries
+backend/python
+
+# Frontend build output
+frontend/dist/
+dist/
+
+# Windows batch files (local dev)
+*.bat

@@ -208,13 +208,20 @@ class OpenRouterProvider(LLMProvider):
                     "model": self.model,
                     "messages": messages,
                     "max_tokens": max_tokens,
-                    "temperature": 0.7
+                    "temperature": 0.7,
+                    "top_p": 0.9
                 },
-                timeout=60
+                timeout=90
             )
 
             if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
+                content = response.json()["choices"][0]["message"]["content"]
+                # Clean up special tokens from model output
+                content = content.replace("<s>", "").replace("</s>", "")
+                content = content.replace("[INST]", "").replace("[/INST]", "")
+                content = content.replace("[OUT]", "").replace("[/OUT]", "")
+                content = content.strip()
+                return content
             else:
                 raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
 

@@ -3,7 +3,7 @@
  * Handles window creation and native OS integration
  */
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const axios = require('axios');
 
@@ -27,7 +27,8 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('index-chat.html');
+  // Start with login page
+  mainWindow.loadFile('login.html');
 
   // Open DevTools in development
   // mainWindow.webContents.openDevTools();
@@ -62,10 +63,31 @@ ipcMain.handle('select-directory', async () => {
 
 ipcMain.handle('index-files', async (event, path, forceReindex = false) => {
   try {
-    const response = await axios.post(`${API_URL}/index`, {
+    // Start indexing (this will run async on backend)
+    const indexPromise = axios.post(`${API_URL}/index`, {
       path: path,
       force_reindex: forceReindex
     });
+
+    // Poll for progress updates
+    const pollProgress = setInterval(async () => {
+      try {
+        const progressResponse = await axios.get(`${API_URL}/index-progress`);
+        event.sender.send('index-progress-update', progressResponse.data);
+      } catch (error) {
+        // Ignore polling errors
+      }
+    }, 500); // Poll every 500ms
+
+    // Wait for indexing to complete
+    const response = await indexPromise;
+
+    // Stop polling
+    clearInterval(pollProgress);
+
+    // Send final 100% update
+    event.sender.send('index-progress-update', { percentage: 100, status: 'complete' });
+
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || error.message);
@@ -111,13 +133,26 @@ ipcMain.handle('check-backend', async () => {
   }
 });
 
-ipcMain.handle('chat-with-ai', async (event, message) => {
+ipcMain.handle('chat-with-ai', async (event, message, maxResults = 5) => {
   try {
     const response = await axios.post(`${API_URL}/chat`, {
       query: message,
-      top_k: 5
+      top_k: maxResults
     }, {
       timeout: 60000 // 60 second timeout for LLM responses
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || error.message);
+  }
+});
+
+ipcMain.handle('summarize-file', async (event, filePath) => {
+  try {
+    const response = await axios.post(`${API_URL}/summarize-file`, {
+      file_path: filePath
+    }, {
+      timeout: 60000 // 60 second timeout for summary generation
     });
     return response.data;
   } catch (error) {
@@ -128,6 +163,23 @@ ipcMain.handle('chat-with-ai', async (event, message) => {
 ipcMain.handle('clear-conversation', async () => {
   try {
     const response = await axios.post(`${API_URL}/clear-conversation`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.detail || error.message);
+  }
+});
+
+ipcMain.handle('show-in-folder', async (event, filePath) => {
+  shell.showItemInFolder(filePath);
+});
+
+ipcMain.handle('open-file', async (event, filePath) => {
+  await shell.openPath(filePath);
+});
+
+ipcMain.handle('cancel-index', async () => {
+  try {
+    const response = await axios.post(`${API_URL}/cancel-index`);
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.detail || error.message);

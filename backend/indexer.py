@@ -75,11 +75,14 @@ class FileIndexer:
     def index_directory(
         self,
         directory: str,
-        force_reindex: bool = False
+        force_reindex: bool = False,
+        progress_callback=None
     ) -> Dict:
         """
         Index all supported files in a directory
         Returns statistics about the indexing process
+
+        progress_callback: Optional function(current, total, percentage) to report progress
         """
         dir_path = Path(directory)
         stats = {
@@ -97,20 +100,35 @@ class FileIndexer:
             self.file_hashes = {}
 
         try:
-            # Recursively find all files
-            for file_path in dir_path.rglob('*'):
-                if not file_path.is_file():
-                    continue
+            # First pass: count all files
+            all_files = [f for f in dir_path.rglob('*') if f.is_file()]
+            total_files = len(all_files)
 
+            if progress_callback:
+                progress_callback(0, total_files, 0)
+
+            processed = 0
+
+            # Second pass: process files
+            for file_path in all_files:
                 stats['total_files'] += 1
+                processed += 1
 
                 # Skip if file hasn't changed and not forcing reindex
                 if not force_reindex and not self._should_reindex(file_path):
                     stats['skipped'] += 1
+                    # Update progress even for skipped files
+                    if progress_callback:
+                        percentage = int((processed / total_files) * 100)
+                        progress_callback(processed, total_files, percentage)
                     continue
 
                 # Check if we can parse this file type
                 if not self.parser.can_parse(file_path):
+                    # Update progress for unsupported files
+                    if progress_callback:
+                        percentage = int((processed / total_files) * 100)
+                        progress_callback(processed, total_files, percentage)
                     continue
 
                 try:
@@ -154,6 +172,11 @@ class FileIndexer:
                     if file_path.suffix.lower() == '.pdf':
                         logger.error(f"PDF parsing failed for: {file_path.name}")
                     stats['errors'] += 1
+
+                # Update progress
+                if progress_callback:
+                    percentage = int((processed / total_files) * 100)
+                    progress_callback(processed, total_files, percentage)
 
         except Exception as e:
             logger.error(f"Error scanning directory: {e}")
