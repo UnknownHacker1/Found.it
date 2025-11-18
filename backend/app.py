@@ -366,10 +366,54 @@ async def chat(request: SearchRequest):
     """
     try:
         if not rag_engine or not rag_engine.is_available():
-            raise HTTPException(
-                status_code=400,
-                detail="RAG engine not ready. Make sure Ollama is running and files are indexed."
-            )
+            # Provide a clearer diagnostic message to help the user fix the problem
+            def _rag_unavailable_diagnostic():
+                msgs = []
+                try:
+                    import config as _config
+                except Exception:
+                    return "RAG unavailable and `config` could not be inspected."
+
+                # Check configured providers
+                if getattr(_config, 'OPENROUTER_API_KEY', ''):
+                    msgs.append("OpenRouter API key is set (check key validity and network connectivity).")
+                else:
+                    msgs.append("No OpenRouter API key configured (`OPENROUTER_API_KEY` is empty).")
+
+                # Check Ollama reachable (if requests installed)
+                try:
+                    import requests as _requests
+                    ollama_url = getattr(_config, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+                    try:
+                        r = _requests.get(f"{ollama_url.rstrip('/')}/api/tags", timeout=2)
+                        if r.status_code == 200:
+                            msgs.append(f"Ollama appears reachable at {ollama_url}.")
+                        else:
+                            msgs.append(f"Ollama responded with status {r.status_code} at {ollama_url}.")
+                    except Exception as e:
+                        msgs.append(f"Ollama not reachable at {ollama_url}: {e}")
+                except Exception:
+                    msgs.append("Python `requests` not installed; cannot probe Ollama.")
+
+                # Check other providers
+                if getattr(_config, 'OPENAI_API_KEY', ''):
+                    msgs.append("OpenAI API key is set (verify `openai` package and key).")
+                if getattr(_config, 'ANTHROPIC_API_KEY', ''):
+                    msgs.append("Anthropic API key is set (verify `anthropic` package and key).")
+
+                # Check index readiness
+                try:
+                    if search_engine.is_ready():
+                        msgs.append("Search index is built and ready.")
+                    else:
+                        msgs.append("Search index is NOT built. Use POST /index to index folders before chatting.")
+                except Exception:
+                    msgs.append("Could not determine search/index status.")
+
+                return " ".join(msgs)
+
+            detail_msg = "RAG engine not ready. " + _rag_unavailable_diagnostic()
+            raise HTTPException(status_code=400, detail=detail_msg)
 
         result = rag_engine.chat(request.query, top_k=request.top_k)
 
@@ -493,6 +537,55 @@ async def get_status():
         "model_loaded": search_engine.model is not None,
         "rag_ready": rag_engine is not None and rag_engine.is_available()
     }
+
+
+@app.get("/health")
+async def health():
+    """Return structured diagnostics for providers, Ollama, index, and RAG readiness"""
+    diagnostics = {
+        "openrouter_key_set": False,
+        "openai_key_set": False,
+        "anthropic_key_set": False,
+        "ollama_reachable": False,
+        "requests_installed": True,
+        "index_ready": False,
+        "rag_ready": False,
+    }
+
+    try:
+        import config as _config
+    except Exception:
+        return JSONResponse(status_code=200, content={"error": "Could not import config module"})
+
+    # Keys
+    diagnostics["openrouter_key_set"] = bool(getattr(_config, "OPENROUTER_API_KEY", ""))
+    diagnostics["openai_key_set"] = bool(getattr(_config, "OPENAI_API_KEY", ""))
+    diagnostics["anthropic_key_set"] = bool(getattr(_config, "ANTHROPIC_API_KEY", ""))
+
+    # Check requests / Ollama
+    try:
+        import requests as _requests
+        ollama_url = getattr(_config, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+        try:
+            r = _requests.get(f"{ollama_url.rstrip('/')}/api/tags", timeout=2)
+            diagnostics["ollama_reachable"] = (r.status_code == 200)
+        except Exception:
+            diagnostics["ollama_reachable"] = False
+    except Exception:
+        diagnostics["requests_installed"] = False
+
+    # Index and RAG
+    try:
+        diagnostics["index_ready"] = search_engine.is_ready()
+    except Exception:
+        diagnostics["index_ready"] = False
+
+    try:
+        diagnostics["rag_ready"] = rag_engine is not None and rag_engine.is_available()
+    except Exception:
+        diagnostics["rag_ready"] = False
+
+    return JSONResponse(status_code=200, content=diagnostics)
 
 
 @app.post("/clear-index")

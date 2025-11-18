@@ -124,6 +124,71 @@ class RAGEngine:
         # This removes the need for hardcoded greetings/phrases
         return "file_search"
 
+    def _detect_format_preference(self, user_message: str) -> tuple:
+        """
+        Detect if user has a specific file format preference in their query.
+        Returns (preferred_formats, should_filter)
+
+        Args:
+            user_message: User's query
+
+        Returns:
+            Tuple of (list of preferred file extensions like ['.pdf', '.xlsx'], bool should_strictly_filter)
+        """
+        message_lower = user_message.lower()
+
+        # Format keyword mappings
+        format_map = {
+            # PDF
+            ('pdf', 'portable document'): ['.pdf'],
+            
+            # Word / Doc
+            ('word', 'doc', '.docx', 'document'): ['.docx', '.doc'],
+            
+            # Excel / Spreadsheet
+            ('excel', 'xlsx', 'xls', 'spreadsheet', 'sheet', 'csv'): ['.xlsx', '.xls', '.csv'],
+            
+            # Text files
+            ('text', '.txt', 'text file', 'notepad'): ['.txt'],
+            
+            # Code
+            ('python', '.py', 'code', 'script'): ['.py'],
+            ('javascript', '.js', 'typescript', '.ts'): ['.js', '.ts'],
+            ('java', '.java'): ['.java'],
+            ('code files', 'source'): ['.py', '.js', '.ts', '.java', '.cpp', '.c'],
+            
+            # Markdown / Notes
+            ('markdown', '.md', 'notes'): ['.md', '.txt'],
+            
+            # Images
+            ('image', 'photo', 'picture', 'jpg', 'png', 'screenshot'): ['.jpg', '.jpeg', '.png', '.gif', '.bmp'],
+            
+            # Presentations
+            ('powerpoint', 'ppt', 'presentation', 'slides'): ['.pptx', '.ppt'],
+            
+            # Archives
+            ('zip', 'archive', 'compressed'): ['.zip', '.rar', '.7z'],
+            
+            # JSON / Config
+            ('json', '.json', 'config'): ['.json', '.yaml', '.yml', '.ini', '.conf'],
+        }
+
+        detected_formats = []
+        for keywords, formats in format_map.items():
+            for keyword in keywords:
+                if keyword in message_lower:
+                    detected_formats.extend(formats)
+                    logger.info(f"Detected format preference from '{keyword}': {formats}")
+                    break
+
+        # Remove duplicates
+        detected_formats = list(set(detected_formats))
+
+        # If user explicitly mentioned a format, strictly filter to that format
+        should_strictly_filter = len(detected_formats) > 0
+
+        return detected_formats, should_strictly_filter
+
     def _has_recent_file_results(self) -> bool:
         """Check if recent conversation has file results"""
         for msg in reversed(self.conversation_history[-3:]):
@@ -247,7 +312,8 @@ class RAGEngine:
 
     def _handle_file_search(self, user_message: str, top_k: int = 5) -> Dict:
         """
-        Handle file search queries - FAST semantic search with confidence filtering
+        Handle file search queries - Use LLM reasoning to understand intent and rank results
+        Now also considers file format preferences from user query.
 
         Args:
             user_message: User's natural language search query
@@ -256,45 +322,101 @@ class RAGEngine:
         Returns:
             Dict with response, files, and reasoning
         """
-        # Use the full natural language query for semantic search
-        search_query = user_message
+        logger.info(f"User query: '{user_message}'")
 
-        # Add synonym expansion for better recall on common terms
-        enhanced_query = self._add_synonym_fallback(search_query, user_message)
-        logger.info(f"Search query: {enhanced_query}")
+        # Detect if user has a file format preference (e.g., "PDF", "Excel", "Word doc")
+        preferred_formats, should_strictly_filter = self._detect_format_preference(user_message)
+        if preferred_formats:
+            logger.info(f"User format preference detected: {preferred_formats} (strict filter: {should_strictly_filter})")
 
-        # Vector search handles natural language understanding
-        candidates = self.search_engine.search(enhanced_query, top_k=top_k)
-        logger.info(f"Vector search found {len(candidates)} candidates")
+        # Step 1: Generate multiple query phrasings using LLM
+        # This captures different interpretations of what the user really wants
+        try:
+            logger.info("Generating alternative query phrasings...")
+            phrasings = self._generate_query_phrasings(user_message)
+            logger.info(f"Generated {len(phrasings)} phrasings for multi-perspective search")
+        except Exception as e:
+            logger.warning(f"Failed to generate phrasings, using direct search: {e}")
+            # Fallback to single enhanced query
+            enhanced_query = self._add_synonym_fallback(user_message, user_message)
+            phrasings = [enhanced_query]
 
-        # CONFIDENCE THRESHOLD: Filter out low-confidence results
-        # Greetings like "hey how are u" will have very low similarity to any file
-        # Typical similarity scores:
-        # - Good match: 0.3-1.0
-        # - Random text/greetings: 0.0-0.2
-        CONFIDENCE_THRESHOLD = 0.25
+        # Step 2: Multi-phrasing search - search with all phrasings to get broader candidate set
+        logger.info("Performing multi-phrasing vector search...")
+        try:
+            candidates = self._multi_phrasing_search(phrasings)
+            logger.info(f"Multi-phrasing search found {len(candidates)} unique candidates")
+        except Exception as e:
+            logger.warning(f"Multi-phrasing search failed, falling back to single search: {e}")
+            # Fallback to simple search
+            enhanced_query = self._add_synonym_fallback(user_message, user_message)
+            candidates = self.search_engine.search(enhanced_query, top_k=min(20, len(self.search_engine.documents or [])))
 
+        # Step 2.5: Apply format filtering if user specified a format
+        if preferred_formats and candidates:
+            logger.info(f"Applying format filter for: {preferred_formats}")
+            
+            # Split candidates into format-matching and non-matching
+            format_matches = [c for c in candidates if c.get('file_type', '').lower() in preferred_formats]
+            non_matches = [c for c in candidates if c.get('file_type', '').lower() not in preferred_formats]
+            
+            if format_matches:
+                logger.info(f"Found {len(format_matches)} files in preferred format(s)")
+                candidates = format_matches + non_matches  # Reorder: preferred formats first
+            elif should_strictly_filter:
+                # User explicitly asked for a format, but no matches found
+                logger.warning(f"No files found in preferred format {preferred_formats}, relaxing filter")
+                # Continue with all candidates but boost format-matching ones
+
+        # Step 3: Use LLM to reason about which files actually match user intent
+        if candidates:
+            logger.info(f"Using LLM to reason about top candidates (with format awareness)...")
+            try:
+                # Use chain-of-thought reasoning to pick the best matches
+                result = self._reason_about_files_chain_of_thought(
+                    user_message, candidates, top_k,
+                    preferred_formats=preferred_formats
+                )
+                return result
+            except Exception as e:
+                logger.error(f"LLM reasoning failed: {e}")
+                # Fallback to confidence threshold
+                logger.info("Falling back to confidence-based filtering...")
+
+        # Fallback: confidence threshold on vector scores
+        CONFIDENCE_THRESHOLD = 0.15  # Lower threshold to catch more relevant matches
         if candidates and candidates[0].get('score', 0) >= CONFIDENCE_THRESHOLD:
-            # High confidence - these are real file matches
-            if len(candidates) == 1:
-                response = f"I found exactly what you're looking for!\n\n📄 {candidates[0]['file_name']}"
+            selected = candidates[:top_k]
+            if len(selected) == 1:
+                response = f"I found exactly what you're looking for!\n\n📄 {selected[0]['file_name']}"
             else:
-                response = f"I found {len(candidates)} files that match your request:\n\n"
-                for i, f in enumerate(candidates, 1):
+                response = f"I found {len(selected)} files that match your request:\n\n"
+                for i, f in enumerate(selected, 1):
                     response += f"{i}. 📄 {f['file_name']}\n"
-
             return {
                 "response": response,
-                "files": candidates,
-                "reasoning": "Semantic vector search"
+                "files": selected,
+                "reasoning": "Vector similarity search"
             }
         else:
-            # Low confidence or no results - likely not a file search query
-            logger.info(f"Low confidence (top score: {candidates[0].get('score', 0) if candidates else 0:.3f}), treating as non-file query")
+            # Even lower threshold as absolute fallback - if anything was found at all, show it
+            if candidates:
+                logger.warning(f"Low confidence ({candidates[0].get('score', 0):.3f}), showing best available matches anyway")
+                selected = candidates[:min(top_k, 3)]  # Show at least the best matches
+                response = f"I found {len(selected)} file(s) that might match your request (lower confidence):\n\n"
+                for i, f in enumerate(selected, 1):
+                    response += f"{i}. 📄 {f['file_name']}\n"
+                return {
+                    "response": response,
+                    "files": selected,
+                    "reasoning": "Low confidence matches - try being more specific"
+                }
+            
+            logger.info(f"No matches found at all")
             return {
-                "response": "Please search for a file.",
+                "response": "I couldn't find files matching your request. Try being more specific or check that files are indexed.",
                 "files": [],
-                "reasoning": "Query has low semantic similarity to indexed files"
+                "reasoning": "No matches found"
             }
 
     def _generate_query_phrasings(self, user_message: str) -> List[str]:
@@ -461,193 +583,254 @@ PHRASING_4: [keywords]"""
 
     def _add_synonym_fallback(self, search_query: str, original_message: str) -> str:
         """
-        Add hardcoded synonyms for common terms that might not be expanded by LLM
-        This ensures critical synonym mappings like "resume" -> "CV" always work
+        Add semantic synonyms using LLM when possible, with fallback to hardcoded mappings.
+        Ensures critical synonym mappings like "resume" -> "CV" are always available.
 
         Args:
-            search_query: Query expanded by LLM
+            search_query: Query to enhance
             original_message: Original user message
 
         Returns:
-            Enhanced query with guaranteed synonyms
+            Enhanced query with synonyms
         """
-        # Common synonym mappings for better semantic search
+        # Hardcoded synonyms for critical common terms (fallback)
+        # Use broader keyword matching to catch variations
         synonym_map = {
-            "resume": "CV curriculum vitae professional experience work history employment history career profile job application",
-            "cv": "resume curriculum vitae professional experience work history employment history career profile job application",
-            "job application": "resume CV cover letter employment application career",
-            "cover letter": "job application resume CV application letter",
-            "travel": "passport visa i94 i-94 immigration arrival departure boarding pass flight ticket",
-            "passport": "travel visa i94 immigration",
-            "visa": "travel passport i94 immigration",
-            "i94": "travel passport visa immigration arrival departure i-94",
-            "budget": "financial report expenses revenue costs spending finance accounting",
-            "financial": "budget expenses revenue costs spending accounting",
-            "tax": "taxes income revenue deduction IRS W2 1040 financial",
-            "invoice": "bill receipt payment charge financial",
-            "contract": "agreement legal document terms conditions",
-            "meeting": "notes minutes agenda discussion call conference",
-            "notes": "meeting minutes documentation memo",
+            # Employment/Career documents
+            "resume": "CV curriculum vitae professional experience work history employment history career profile job application employment record",
+            "cv": "resume curriculum vitae professional experience work history employment history career profile job application employment record",
+            "job": "resume CV employment career application offer letter position role hire hiring work",
+            "job application": "resume CV cover letter employment application career position offer",
+            "job document": "resume CV employment career application offer cover letter portfolio work history",
+            "job offer": "employment offer acceptance letter position role hire contract negotiation",
+            "cover letter": "job application resume CV application letter employment",
+            "employment": "job resume CV work career employment history position",
+            
+            # Travel documents
+            "travel": "passport visa i94 i-94 immigration arrival departure boarding pass flight ticket travel authorization",
+            "passport": "travel visa i94 immigration documents travel",
+            "visa": "travel passport i94 immigration documents",
+            "i94": "travel passport visa immigration arrival departure i-94 form travel documents",
+            
+            # Financial/Budget documents
+            "budget": "financial report expenses revenue costs spending finance accounting spreadsheet",
+            "financial": "budget expenses revenue costs spending accounting statements report",
+            "tax": "taxes income revenue deduction IRS W2 1040 financial return filing",
+            "invoice": "bill receipt payment charge financial statement transaction",
+            
+            # Legal/Contract documents
+            "contract": "agreement legal document terms conditions signature",
+            
+            # Meeting/Discussion documents
+            "meeting": "notes minutes agenda discussion call conference recording transcript",
+            "notes": "meeting minutes documentation memo records discussion",
+            
+            # Reports/Documentation
+            "report": "analysis summary findings conclusion document paper",
+            "document": "file paper report memo record letter",
         }
 
         # Check if any synonym keys appear in original message (case insensitive)
         original_lower = original_message.lower()
         added_terms = set()
 
+        # First pass: exact phrase matching
         for key, synonyms in synonym_map.items():
             if key in original_lower:
                 # Add synonyms if not already in query
                 for term in synonyms.split():
                     if term.lower() not in search_query.lower():
                         added_terms.add(term)
+                logger.info(f"Synonym match found for '{key}'")
 
+        enhanced = search_query
         if added_terms:
-            enhanced_query = search_query + " " + " ".join(added_terms)
-            logger.info(f"Added synonym fallback terms: {added_terms}")
-            return enhanced_query
+            enhanced = search_query + " " + " ".join(added_terms)
+            logger.info(f"Added {len(added_terms)} synonym terms: {', '.join(list(added_terms)[:10])}...")
 
-        return search_query
+        # Try LLM expansion for even better recall
+        if self.llm:
+            try:
+                expansion_prompt = f"""Generate 8-15 additional keywords and synonyms for this search query that would help find relevant files:
+
+Query: "{original_message}"
+Current expanded query: "{enhanced}"
+
+Add terms that:
+1. Are semantically related (not just word variants)
+2. Represent alternative ways someone might name or refer to similar files
+3. Include domain terms, abbreviations, and related concepts
+4. Think about different contexts where such files appear
+
+Examples:
+- For "job documents": also add: employment, career, CV, resume, application, offer letter, position, hire
+- For "meeting notes": also add: minutes, transcript, recording, summary, discussion, agenda
+- For "2023 taxes": also add: tax return, 1040, filing, income statement, W2, deduction
+
+Return only the additional keywords, space-separated:"""
+
+                additional = self.llm.generate(expansion_prompt, max_tokens=120).strip()
+                if additional:
+                    enhanced = enhanced + " " + additional
+                    logger.info(f"LLM expanded query with: {additional[:80]}...")
+            except Exception as e:
+                logger.debug(f"LLM expansion failed (using hardcoded only): {e}")
+
+        return enhanced
 
     def _extract_keywords(self, user_message: str) -> str:
         """
-        Extract keywords from user's search query using AI
+        Extract and expand keywords semantically using AI
 
         Args:
             user_message: User's natural language message
 
         Returns:
-            Space-separated keywords
+            Space-separated keywords and synonyms
         """
-        prompt = f"""You are a keyword extraction expert. Extract the ESSENTIAL keywords from this search query.
+        if not self.llm:
+            # Fallback: just return original message if no LLM
+            return user_message
 
-User query: "{user_message}"
+        prompt = f"""You are a semantic keyword extraction expert. Extract ALL relevant keywords and synonyms that would help find files matching this user's intent.
 
-Rules:
-1. Extract ONLY the most important keywords (nouns, verbs, key concepts)
-2. Include ALL synonyms and related terms for those keywords
-3. Remove filler words (the, a, an, my, etc.)
-4. Return space-separated keywords ONLY
+User's intent: "{user_message}"
 
-Examples:
-Input: "find my resume"
-Output: "resume CV curriculum vitae professional experience work history employment"
+Your task:
+1. Identify what the user is REALLY looking for (the actual need, not just surface words)
+2. List all keywords, synonyms, and related terms that file names or content might use
+3. Include domain-specific terms, abbreviations, and alternative phrasings
+4. Think about different ways files could be named or organized
 
-Input: "show me travel documents"
-Output: "travel documents passport visa i94 immigration boarding pass ticket"
+Return ONLY space-separated keywords and synonyms. Example:
+Input: "show me my 2024 tax documents"
+Output: "tax 2024 taxes 1040 W2 filing return income IRS deduction document"
 
-Input: "where are my tax files from 2023"
-Output: "tax taxes 2023 income revenue IRS W2 1040 financial documents"
+Input: "find my job offer letter"
+Output: "job offer letter employment offer acceptance hire hiring position role contract"
 
-Now extract keywords from: "{user_message}"
-
-Keywords (space-separated):"""
+For: "{user_message}"
+Keywords:"""
 
         try:
-            keywords = self.llm.generate(prompt, max_tokens=200)
-            extracted = keywords.strip()
-            logger.info(f"Original query: '{user_message}'")
-            logger.info(f"Extracted keywords: '{extracted}'")
-            return extracted
+            keywords = self.llm.generate(prompt, max_tokens=150).strip()
+            logger.info(f"Extracted keywords: {keywords[:100]}...")
+            return keywords if keywords else user_message
         except Exception as e:
-            logger.error(f"Error extracting keywords: {e}")
-            # Fallback to original message
+            logger.warning(f"Keyword extraction failed, using original: {e}")
             return user_message
 
     def _reason_about_files_chain_of_thought(
         self,
         user_message: str,
         candidates: List[Dict],
-        top_k: int
+        top_k: int,
+        preferred_formats: List[str] = None
     ) -> Dict:
         """
-        Use LLM with FULL chain-of-thought reasoning to analyze EVERY file
-        The LLM must explicitly explain its reasoning for each candidate
+        Use LLM with deep semantic reasoning to understand user intent and pick best files.
+        The LLM reads each file preview and reasons about whether it matches the user's REAL need,
+        considering file format preferences if specified.
 
         Args:
             user_message: User's original request
             candidates: List of candidate files from vector search
             top_k: Number of files to return
+            preferred_formats: List of preferred file extensions (e.g., ['.pdf', '.xlsx'])
 
         Returns:
             Dict with response, selected files, and reasoning
         """
-        # Show top 20 candidates to LLM for thorough analysis
+        if not candidates:
+            return {
+                "response": "I couldn't find any files matching your request.",
+                "files": [],
+                "reasoning": "No candidates found"
+            }
+
+        # Show top 25 candidates to LLM for thorough semantic analysis
         files_info = []
-        for i, candidate in enumerate(candidates[:20]):
+        for i, candidate in enumerate(candidates[:25]):
+            file_format = candidate.get('file_type', 'unknown')
+            # Mark preferred format files
+            format_marker = " ⭐" if preferred_formats and file_format in preferred_formats else ""
             files_info.append(
-                f"{i+1}. {candidate['file_name']} ({candidate['file_type']})\n"
-                f"   Preview: {candidate.get('preview', 'No preview available')[:300]}...\n"
+                f"{i+1}. {candidate['file_name']} ({file_format}){format_marker}\n"
+                f"   Preview: {candidate.get('preview', 'No preview available')[:400]}\n"
             )
 
         files_text = "\n".join(files_info)
+        
+        # Add format preference context to prompt
+        format_context = ""
+        if preferred_formats:
+            format_context = f"\n\nUSER FORMAT PREFERENCE: {', '.join(preferred_formats)}\nPrioritize files with these formats, but also consider other formats if they're better matches."
 
-        # Enhanced chain-of-thought prompt - forces EXPLICIT reasoning for each file
-        prompt = f"""You are an expert file search assistant. You must analyze EVERY SINGLE file and explain your reasoning out loud.
+        # Deep semantic reasoning prompt - forces LLM to UNDERSTAND not just match keywords
+        prompt = f"""You are an expert file search AI with deep understanding of document types and user intent.
 
-User's request: "{user_message}"
+User's request: "{user_message}"{format_context}
 
-Available files to analyze:
+CRITICAL REMINDER - UNDERSTAND USER INTENT:
+- "find job documents" = looking for CV, resume, employment records, job offers, cover letters
+- "find travel documents" = looking for passport, visa, i94, boarding passes, travel itineraries
+- "find financial documents" = looking for taxes, budgets, invoices, bank statements
+- Think SEMANTICALLY about what files match the user's REAL NEED, not just keyword overlap.
+
+Now analyze EVERY candidate file carefully:
+
+Available files to choose from:
 {files_text}
 
-CRITICAL INSTRUCTIONS:
-1. GO THROUGH EACH FILE ONE BY ONE - DO NOT SKIP ANY
-2. For EACH file, you MUST write:
-   - What type of document it is (based on name and preview)
-   - Does it match what the user wants? (YES/NO/MAYBE)
-   - WHY or WHY NOT (be specific about your reasoning)
+For each file, ask yourself:
+1. What type of document is this? (infer from name + preview)
+2. Does it match what the user is looking for? YES/NO/MAYBE
+3. How confident are you? HIGH/MEDIUM/LOW
+4. Why? (be specific - reference name and preview content)
+5. If user wants "job documents" - does this contain work/career info? (CV, resume, offer, etc.)
 
-3. Think about:
-   - File NAME (does it suggest the right content?)
-   - File TYPE (PDF, DOCX, etc.)
-   - PREVIEW content (what does the text tell you?)
-   - User's INTENT (what are they really looking for?)
+Then select the top {min(top_k, 5)} files that best match the user's ACTUAL need.
+BE GENEROUS in matching - if it's plausibly related, give it credit.
 
-4. Remember common synonyms:
-   - Resume = CV = Curriculum Vitae = Professional Experience = Employment History
-   - Travel documents = Passport = Visa = i94 = Immigration papers
-   - Budget = Financial report = Expenses = Revenue
+OUTPUT FORMAT (EXACTLY):
+FILE_ANALYSIS:
+1. [filename] - [Document type]. Match: [YES/NO/MAYBE]. Confidence: [HIGH/MEDIUM/LOW]. Reason: [reason]
+2. [filename] - [Document type]. Match: [YES/NO/MAYBE]. Confidence: [HIGH/MEDIUM/LOW]. Reason: [reason]
+... (analyze ALL {min(len(candidates), 25)} files)
 
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+SELECTED_FILES: [comma-separated numbers, e.g., "1, 3, 5"]
+CONFIDENCE: [HIGH/MEDIUM/LOW]
+EXPLANATION: [1-2 sentences]
 
-ANALYSIS:
-File 1: [filename]
-Type: [what kind of document]
-Match: [YES/NO/MAYBE]
-Reasoning: [explain why - be specific about what you see in the preview and name]
+IMPORTANT:
+- Analyze EVERY file - don't skip
+- Be generous about what counts as a match
+- Think about file PURPOSE and CONTENT first
+- Consider that people name files inconsistently
+- If user says "job documents", CV/resume/employment files are ALWAYS matches
 
-File 2: [filename]
-Type: [what kind of document]
-Match: [YES/NO/MAYBE]
-Reasoning: [explain why - be specific]
-
-... (CONTINUE FOR ALL {min(20, len(candidates))} FILES - DO NOT SKIP ANY!)
-
-SELECTED: [comma-separated file numbers of top {top_k} matches, e.g., "1, 5, 8"]
-
-SUMMARY: [One sentence explaining why you chose these files]
-
-BEGIN YOUR ANALYSIS NOW:"""
+Begin your analysis:"""
 
         try:
-            llm_response = self.llm.generate(prompt, max_tokens=3000)
+            llm_response = self.llm.generate(prompt, max_tokens=4000)
 
-            # Log the FULL chain-of-thought reasoning
+            # Log the full reasoning for debugging
             logger.info("=" * 100)
-            logger.info("FULL CHAIN-OF-THOUGHT REASONING:")
+            logger.info("SEMANTIC ANALYSIS REASONING:")
             logger.info("=" * 100)
-            logger.info(llm_response)
+            logger.info(llm_response[:2000])  # Log first 2000 chars
             logger.info("=" * 100)
 
             # Parse LLM response
             selected_files = []
-            summary = ""
+            explanation = ""
+            confidence = "MEDIUM"
 
             lines = llm_response.strip().split('\n')
             for line in lines:
-                if line.startswith("SELECTED:"):
+                if line.startswith("SELECTED_FILES:"):
                     # Extract file numbers
-                    numbers_str = line.replace("SELECTED:", "").strip()
-                    # Handle various formats: "1, 3, 5" or "1,3,5" or "1 3 5"
+                    numbers_str = line.replace("SELECTED_FILES:", "").strip()
                     numbers_str = numbers_str.replace(',', ' ')
                     numbers = []
                     for part in numbers_str.split():
@@ -659,44 +842,48 @@ BEGIN YOUR ANALYSIS NOW:"""
                         if 0 < num <= len(candidates):
                             selected_files.append(candidates[num - 1])
 
-                elif line.startswith("SUMMARY:"):
-                    summary = line.replace("SUMMARY:", "").strip()
-                elif summary:  # Continue summary on next lines
-                    if not line.startswith("ANALYSIS") and not line.startswith("File "):
-                        summary += " " + line.strip()
+                elif line.startswith("CONFIDENCE:"):
+                    confidence = line.replace("CONFIDENCE:", "").strip()
+
+                elif line.startswith("EXPLANATION:"):
+                    explanation = line.replace("EXPLANATION:", "").strip()
+                elif explanation and not line.startswith("FILE_ANALYSIS"):
+                    explanation += " " + line.strip()
 
             # Fallback if parsing failed
             if not selected_files:
-                logger.warning("Failed to parse LLM selection, using top candidates from vector search")
+                logger.warning("Failed to parse LLM selection, using top candidates")
                 selected_files = candidates[:top_k]
-                summary = "Selected top matches based on vector similarity scores."
+                explanation = "Selected top matches from semantic search."
 
             # Create natural language response
             if selected_files:
                 if len(selected_files) == 1:
-                    response = f"I found exactly what you're looking for! {summary}\n\n📄 {selected_files[0]['file_name']}"
+                    response = f"I found exactly what you're looking for!\n\n📄 {selected_files[0]['file_name']}"
                 else:
-                    response = f"I found {len(selected_files)} files that match your request. {summary}\n\n"
+                    response = f"I found {len(selected_files)} file(s) matching your request:\n\n"
                     for i, f in enumerate(selected_files, 1):
                         response += f"{i}. 📄 {f['file_name']}\n"
+
+                response += f"\n{explanation}"
             else:
-                response = "I couldn't find any files that match your request. Try:\n• Indexing more folders\n• Using different keywords\n• Rephrasing your search"
+                response = "I couldn't find files that clearly match your request. Try rephrasing or check that files are indexed."
 
             return {
                 "response": response,
                 "files": selected_files,
-                "reasoning": summary
+                "reasoning": f"{explanation} (Confidence: {confidence})"
             }
 
         except Exception as e:
-            logger.error(f"Error in chain-of-thought reasoning: {e}")
+            logger.error(f"Error in semantic reasoning: {e}")
             import traceback
             traceback.print_exc()
             # Fallback to top candidates
             return {
-                "response": f"I found {len(candidates[:top_k])} potentially relevant files based on similarity.",
+                "response": f"I found {len(candidates[:top_k])} potentially relevant files based on semantic similarity.",
                 "files": candidates[:top_k],
-                "reasoning": f"Chain-of-thought reasoning failed: {str(e)}"
+                "reasoning": f"Semantic reasoning unavailable: {str(e)}"
             }
 
     def _reason_about_files_verbose(
