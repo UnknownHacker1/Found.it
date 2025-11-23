@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js / Electron
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Electron build output
+out/
+dist-electron/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Index files (user-specific data)
+backend/file_index.json
+backend/file_index.pkl
+backend/faiss_index/
+backend/*.index
+
+# Logs
+*.log
+logs/
+
+# Environment variables (contains API keys)
+.env
+.env.local
+
+# API Keys - DO NOT COMMIT THESE FILES
+backend/config.py
+config.py
+
+# C++ build files and artifacts
+*.exe
+*.obj
+*.o
+*.out
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backend local binaries
+backend/python
+
+# Frontend build output
+frontend/dist/
+dist/
+
+# Windows batch files (local dev)
+*.bat

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundit - Login</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <img src="logo.png" alt="Foundit Logo" width="200">
+            </div>
+
+            <h1>Lost it? Found.it!</h1>
+            <p class="subtitle">Find any file on your computer with AI</p>
+
+            <div class="features">
+                <div class="feature">
+                    <span class="icon">🔍</span>
+                    <span>Find files using natural language</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">🧠</span>
+                    <span>AI understands what you're looking for</span>
+                </div>
+                <div class="feature">
+                    <span class="icon">🔒</span>
+                    <span>100% local - your files stay private</span>
+                </div>
+            </div>
+
+            <div class="login-section">
+                <button id="googleLoginBtn" class="google-login-btn">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.64 9.2C17.64 8.46 17.58 7.92 17.45 7.36H9V10.7H13.96C13.86 11.53 13.32 12.78 12.12 13.62L12.1 13.75L14.77 15.82L14.96 15.84C16.66 14.27 17.64 11.94 17.64 9.2Z" fill="#4285F4"/>
+                        <path d="M9 18C11.43 18 13.47 17.19 14.96 15.84L12.12 13.62C11.36 14.15 10.34 14.52 9 14.52C6.62 14.52 4.61 12.95 3.88 10.79L3.76 10.8L1.01 12.96L0.97 13.07C2.45 15.98 5.48 18 9 18Z" fill="#34A853"/>
+                        <path d="M3.88 10.79C3.69 10.22 3.58 9.62 3.58 9C3.58 8.38 3.69 7.78 3.87 7.21L3.87 7.07L1.09 4.88L0.97 4.94C0.35 6.18 0 7.55 0 9C0 10.45 0.35 11.82 0.97 13.06L3.88 10.79Z" fill="#FBBC05"/>
+                        <path d="M9 3.48C10.77 3.48 11.99 4.13 12.69 4.78L15.21 2.34C13.46 0.89 11.43 0 9 0C5.48 0 2.45 2.02 0.97 4.93L3.87 7.2C4.61 5.05 6.62 3.48 9 3.48Z" fill="#EB4335"/>
+                    </svg>
+                    <span>Continue with Google</span>
+                </button>
+
+                <div class="divider">
+                    <span>or</span>
+                </div>
+
+                <button id="skipButton" class="skip-btn">
+                    Continue as Guest
+                </button>
+            </div>
+
+            <p class="demo-notice">
+                No sign-up required • Privacy-first • 100% local AI
+            </p>
+
+            <div id="status" class="status-message"></div>
+        </div>
+    </div>
+
+    <script src="renderer-login.js"></script>
+</body>
+</html>
