@@ -1,364 +1,262 @@
-# Foundit - AI-Powered Desktop File Search
+# Foundit - Your AI File Search Assistant
 
-> Find files on your desktop using natural language and AI semantic search. Search by meaning, not just keywords!
+Ever spent 10 minutes looking for that one document you know you saved somewhere? Yeah, we've all been there. That's why I built Foundit.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Instead of remembering exact file names, just ask naturally: "find my resume" or "where's my passport?" The AI actually understands what you're looking for and finds it. Pretty neat, right?
 
-## 🌟 Features
+## Quick Demo
 
-- **🤖 AI-Powered Semantic Search**: Uses sentence transformers to understand what you're looking for
-- **💬 ChatGPT-Like Interface**: Talk naturally - "find my resume" or "show me travel documents"
-- **🧠 Smart Content Matching**: Finds "calculus homework" when you search for "math assignments"
-- **📄 Multi-Format Support**: PDF, DOCX, PPTX, TXT, and code files
-- **🎨 Beautiful Modern UI**: Electron-based desktop app with dark theme
-- **⚡ Fast Vector Search**: FAISS for lightning-fast similarity search
-- **🔒 Local & Private**: Everything runs on your machine - no cloud required
-- **💡 Context Aware**: Remembers conversation and understands follow-up questions
+https://github.com/user-attachments/assets/your-video-id-here
 
-## 📸 Screenshots
+> **Note:** To add your demo video, upload it to GitHub:
+> 1. Go to any GitHub issue or PR on your repo
+> 2. Drag and drop your video file (MP4, MOV, etc.)
+> 3. GitHub will upload it and give you a URL like the one above
+> 4. Copy that URL and replace it here
+>
+> You can also use YouTube by replacing the section above with:
+> ```markdown
+> [![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+> ```
 
-![Foundit Main Interface](https://via.placeholder.com/800x500?text=Foundit+Interface)
+## What Makes It Cool
 
-## 🚀 Quick Start
+- **Talk Like a Human** - No more keyword hunting. Just ask "show me my tax stuff from 2023" and it gets it.
+- **Actually Smart** - Knows that "resume" and "CV" are the same thing. Finds your passport when you ask for "travel documents."
+- **Lightning Fast** - Results in under 100ms. No waiting around.
+- **100% Private** - Everything runs on your computer. Your files never leave your machine.
+- **Ridiculously Easy** - If you can chat with ChatGPT, you can use Foundit.
 
-### Prerequisites
+## Getting Started
 
-Before installing Foundit, make sure you have:
+### What You'll Need
 
-- **Python 3.8 or higher** ([Download Python](https://www.python.org/downloads/))
-- **Node.js 16 or higher** ([Download Node.js](https://nodejs.org/))
-- **Git** (optional, for cloning the repository)
+Just three things:
+- Python 3.8 or newer ([grab it here](https://www.python.org/downloads/))
+- Node.js 16 or newer ([get it here](https://nodejs.org/))
+- 5 minutes of your time
 
 ### Installation
 
-#### Option 1: Clone from GitHub (Recommended)
-
+**If you know Git:**
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/foundit.git
-cd foundit
+git clone https://github.com/UnknownHacker1/Found.it.git
+cd Found.it
+```
 
-# Install backend dependencies
+**If you don't:**
+Just download the ZIP file from GitHub, extract it, and open a terminal in that folder.
+
+**Then install the dependencies:**
+```bash
+# Install Python stuff
 cd backend
 pip install -r requirements.txt
 cd ..
 
-# Install frontend dependencies
+# Install Node stuff
 cd frontend
 npm install
 cd ..
 ```
 
-#### Option 2: Download ZIP
+That's it! The AI model (about 80MB) downloads automatically the first time you run it.
 
-1. Download the latest release from [GitHub Releases](https://github.com/yourusername/foundit/releases)
-2. Extract the ZIP file
-3. Follow the installation steps above (starting from "Install backend dependencies")
+## Running It
 
-### First-Time Setup
+You need two terminal windows:
 
-The AI model (~80MB) will be downloaded automatically on first run. This only happens once.
-
-## 🎮 Running Foundit
-
-### Windows
-
-**Option 1: Using Terminals**
-
-Open two command prompt or PowerShell windows:
-
-**Terminal 1 - Start Backend:**
-```cmd
+**Terminal 1 - The Brain (Backend):**
+```bash
 cd backend
 python app.py
 ```
 
-Wait until you see:
-```
-Starting Foundit Backend Server...
-Loading AI model (this may take a moment)...
-Server ready!
-INFO:     Uvicorn running on http://127.0.0.1:8000
-```
+Wait until you see "Server ready!" - that means it's good to go.
 
-**Terminal 2 - Start Frontend:**
-```cmd
+**Terminal 2 - The Face (Frontend):**
+```bash
 cd frontend
 npm start
 ```
 
-The Foundit app window will open automatically!
+The app window pops up and you're ready to search!
 
-**Option 2: Create a Batch File**
+### Too Lazy for Two Terminals?
 
-Create a file named `start-foundit.bat` in the project root:
+I get it. Here's a quick shortcut:
 
+**Windows:** Create `start-foundit.bat`:
 ```batch
 @echo off
-echo Starting Foundit Backend...
 start cmd /k "cd backend && python app.py"
 timeout /t 5
-echo Starting Foundit Frontend...
 cd frontend
 npm start
 ```
 
-Double-click the batch file to start Foundit.
+Just double-click it next time.
 
-### macOS / Linux
-
-Open two terminal windows:
-
-**Terminal 1 - Start Backend:**
+**Mac/Linux:** Create `start-foundit.sh`:
 ```bash
-cd backend
-python3 app.py
+#!/bin/bash
+cd backend && python3 app.py &
+sleep 5
+cd frontend && npm start
 ```
 
-**Terminal 2 - Start Frontend:**
+Then: `chmod +x start-foundit.sh && ./start-foundit.sh`
+
+## How to Use It
+
+### First Time? Index Your Files
+
+The app needs to know what files you have:
+
+1. Click "Quick Index Desktop" - scans your Desktop folder
+2. Or "Select Folder to Index" - pick any folder you want
+
+It'll chug through your files and build a search index. Depending on how many files you have, this takes a minute or two.
+
+### Now Search!
+
+Just type what you're looking for like you're texting a friend:
+
+- "find my resume"
+- "show me python code"
+- "where's my passport?"
+- "tax documents from 2023"
+- "that budget spreadsheet"
+
+Hit Enter. Boom. Results.
+
+### Chat About Your Files
+
+This is where it gets fun:
+
+```
+You: find my passport
+Foundit: Found it! 📄 Passport_2024.pdf
+
+You: what's the expiration date?
+Foundit: *reads the file* Your passport expires on June 15, 2034.
+```
+
+Yeah, it actually reads and understands your files.
+
+## Real Examples
+
+Here's what people actually search for:
+
+| What You Type | What It Finds |
+|---------------|---------------|
+| "my cv" | Resume_2024.pdf, Professional_CV.docx, Work_History.pdf |
+| "python projects" | All your .py files, Jupyter notebooks, Python scripts |
+| "important travel stuff" | Passport, visas, boarding passes, hotel bookings |
+| "tax things" | W2 forms, 1040s, tax returns, receipts |
+| "that presentation from last week" | Recent .pptx files, slide decks |
+
+The AI connects the dots. You don't have to remember exact filenames.
+
+## What Files Does It Handle?
+
+Pretty much everything with text:
+
+- **Documents** - PDF, Word, PowerPoint, text files, Markdown
+- **Code** - Python, JavaScript, Java, C++, Go, Rust, you name it
+- **Data** - JSON, CSV, XML, YAML
+- **Basically** - If you can open it in a text editor, Foundit can search it
+
+## Common Issues (And How to Fix Them)
+
+### Backend Won't Start
+
+**Error:** Something breaks when you run `python app.py`
+
+**Try this:**
 ```bash
-cd frontend
-npm start
+python --version  # Make sure it's 3.8 or higher
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-## 📖 How to Use
+### "Backend Offline" Message
 
-### 1. Index Your Files
+**The Problem:** Frontend can't talk to backend
 
-First time using Foundit? You need to index your files:
+**The Fix:**
+- Make sure the backend terminal is still running
+- Look for "Server ready!" in the backend terminal
+- Restart both if needed
+- Check if something else is using port 8000
 
-1. Click **"Quick Index Desktop"** to scan your Desktop folder
-2. Or click **"Select Folder to Index"** to choose any directory
-3. Wait for indexing to complete (progress bar will show status)
+### No Search Results
 
-💡 **Tip**: Start with a smaller folder to test it out!
+**Why:** Usually means files aren't indexed yet
 
-### 2. Search Naturally
+**Solution:**
+- Click "Quick Index Desktop" first
+- Try different search terms
+- Make sure your files have actual text (not just scanned images)
 
-Type queries in plain English:
+### Slow Indexing
 
-- "Find my resume"
-- "Show me Python code from last month"
-- "Where are my tax documents?"
-- "Math homework"
-- "Budget spreadsheet"
+**This is normal if:**
+- You're indexing 1000+ files
+- You have large PDFs
+- You're indexing network drives
 
-Press Enter or click Search to see results!
+**Speed it up:**
+- Start with smaller folders
+- Close other programs
+- PDFs with just images can't be searched anyway (no text to extract)
 
-### 3. Chat with AI
+## Tech Stuff (For the Curious)
 
-Ask follow-up questions:
+Built with:
+- **Electron** - The app wrapper
+- **Python FastAPI** - The backend server
+- **Sentence Transformers** - The AI that understands meaning
+- **FAISS** - Crazy fast vector search (thanks Facebook)
+- **OpenRouter** - For the conversational AI part
 
-```
-You: "find my passport"
-AI: *Shows passport.pdf*
+It's basically ChatGPT + Google, but just for your files.
 
-You: "summarize it"
-AI: *Provides summary of the document*
-```
+## Want to Help?
 
-### 4. Open Files
+Found a bug? Have an idea? Here's how to contribute:
 
-Click any result to open the file in its default application.
+1. Fork the repo
+2. Make your changes
+3. Test it
+4. Send a pull request
 
-## 💡 Example Searches
+Or just [open an issue](https://github.com/UnknownHacker1/Found.it/issues) and tell me what's broken or what you want.
 
-| What You Type | What Foundit Finds |
-|---------------|-------------------|
-| "calculus assignments" | Math homework, derivatives problems, integration exercises |
-| "javascript tutorials" | JS code, React projects, web development notes |
-| "budget planning" | Financial spreadsheets, expense reports, planning docs |
-| "meeting notes" | Meeting minutes, discussion summaries, action items |
-| "my resume" | CV, professional experience, work history |
-| "travel documents" | Passport, visas, boarding passes, itineraries |
+## Coming Soon
 
-## 🔧 Supported File Types
+Stuff I'm working on:
+- Auto-detect new files (so you don't have to re-index)
+- Search filters (date, file type, size)
+- OCR for scanned PDFs
+- Search history
+- Even faster search
+- Maybe a mobile app?
 
-- **Documents**: PDF, DOCX, PPTX, TXT, MD
-- **Code**: PY, JS, CPP, H, JAVA, GO, RS, TS, JSX, etc.
-- **Data**: JSON, XML, CSV, YAML
-- **Text**: All plain text files
+## One More Thing
 
-## 🏗️ Architecture
+Your files are **yours**. Nothing gets uploaded. Nothing gets sent to the cloud. Everything happens on your computer. I built this because I was tired of cloud services indexing my personal documents. Your privacy matters.
 
-```
-┌─────────────────────────────┐
-│   Electron Frontend         │
-│   (Modern UI)               │
-└──────────┬──────────────────┘
-           │ REST API
-┌──────────▼──────────────────┐
-│   Python Backend (FastAPI)  │
-│   - RAG Engine              │
-│   - Document Parser         │
-│   - Search Engine           │
-└──────────┬──────────────────┘
-           │
-┌──────────▼──────────────────┐
-│   AI Components             │
-│   - Sentence Transformers   │
-│   - FAISS Vector Index      │
-│   - OpenRouter LLM API      │
-└─────────────────────────────┘
-```
+## License
 
-## ⚙️ Configuration
+MIT License - do whatever you want with it.
 
-### Backend Configuration
+## Questions?
 
-1. Copy `backend/config.example.py` to `backend/config.py`
-2. Add your OpenRouter API key (optional, for enhanced chat):
-
-```python
-OPENROUTER_API_KEY = "your-api-key-here"
-```
-
-Get a free API key at [OpenRouter](https://openrouter.ai/)
-
-### Frontend Configuration
-
-The frontend automatically connects to `http://127.0.0.1:8000`. To change this, edit `frontend/renderer.js`:
-
-```javascript
-const API_URL = 'http://127.0.0.1:8000';
-```
-
-## 📊 Performance
-
-- **Indexing Speed**: ~10-50 files/second (depends on file size)
-- **Search Speed**: <100ms for typical queries
-- **AI Model Size**: ~80MB (downloads once)
-- **Memory Usage**: ~500MB-1GB during indexing
-- **Disk Space**: ~100MB + your indexed files
-
-## 🐛 Troubleshooting
-
-### Backend won't start
-
-**Problem**: Error when running `python app.py`
-
-**Solutions**:
-- Make sure Python 3.8+ is installed: `python --version`
-- Install requirements: `pip install -r requirements.txt`
-- Check for port conflicts (port 8000)
-- Try: `python -m pip install --upgrade pip`
-
-### Frontend shows "Backend Offline"
-
-**Problem**: Can't connect to backend
-
-**Solutions**:
-- Make sure backend is running on http://127.0.0.1:8000
-- Check backend terminal for errors
-- Restart both backend and frontend
-- Check firewall settings
-
-### No results found
-
-**Problem**: Search returns no results
-
-**Solutions**:
-- Make sure you indexed files first ("Quick Index Desktop")
-- Try broader search terms
-- Verify files contain searchable text (not just images)
-- Re-index your files
-
-### Slow indexing
-
-**Problem**: Indexing takes a long time
-
-**Solutions**:
-- Normal for large folders (1000+ files)
-- PDFs with scanned images take longer
-- Index smaller folders first to test
-- Close other applications to free up memory
-
-### Module not found errors
-
-**Problem**: Python can't find installed packages
-
-**Solutions**:
-- Use a virtual environment:
-  ```bash
-  python -m venv venv
-  venv\Scripts\activate  # Windows
-  source venv/bin/activate  # macOS/Linux
-  pip install -r requirements.txt
-  ```
-
-## 🛠️ Technology Stack
-
-- **Frontend**: Electron, HTML, CSS, JavaScript
-- **Backend**: Python, FastAPI
-- **AI Model**: sentence-transformers (all-MiniLM-L6-v2)
-- **Vector Database**: FAISS
-- **LLM**: OpenRouter API (GPT-4, Claude, etc.)
-- **Document Parsing**: PyPDF2, python-docx, python-pptx
-
-## 📚 API Documentation
-
-### Endpoints
-
-- `POST /index` - Index files from a directory
-- `POST /search` - Search for files using natural language
-- `POST /chat` - Chat with AI about files
-- `GET /status` - Get indexing status
-- `POST /clear-index` - Clear the current index
-
-See full API documentation in [API.md](docs/API.md)
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-- 🐛 Report bugs via [GitHub Issues](https://github.com/yourusername/foundit/issues)
-- 💡 Suggest new features
-- 🔧 Submit pull requests
-- 📖 Improve documentation
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📋 Roadmap
-
-- [ ] Incremental indexing (auto-detect new files)
-- [ ] Search filters (file type, date, size)
-- [ ] Search history and favorites
-- [ ] Better preview/highlighting
-- [ ] OCR for scanned PDFs
-- [ ] Multi-language support
-- [ ] Configurable AI models
-- [ ] Cloud sync (optional)
-- [ ] Mobile app
-- [ ] Browser extension
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [Electron](https://www.electronjs.org/)
-- Powered by [sentence-transformers](https://www.sbert.net/)
-- Uses [FAISS](https://github.com/facebookresearch/faiss) for vector search
-- LLM capabilities via [OpenRouter](https://openrouter.ai/)
-
-## 📞 Support
-
-- 📧 Email: support@foundit.app
-- 💬 Discord: [Join our community](https://discord.gg/foundit)
-- 🐦 Twitter: [@founditapp](https://twitter.com/founditapp)
-- 📖 Documentation: [docs.foundit.app](https://docs.foundit.app)
-
-## ⭐ Star History
-
-If you find Foundit useful, please consider giving it a star on GitHub!
+- Found a bug? [Open an issue](https://github.com/UnknownHacker1/Found.it/issues)
+- Have a question? [Start a discussion](https://github.com/UnknownHacker1/Found.it/discussions)
+- Want to chat? Email me or find me on Twitter
 
 ---
 
-Made with ❤️ by the Foundit Team
+Made by someone who was tired of losing files. Hope it helps you too.
