@@ -6,18 +6,8 @@ Instead of remembering exact file names, just ask naturally: "find my resume" or
 
 ## Quick Demo
 
-https://github.com/user-attachments/assets/your-video-id-here
+https://github.com/UnknownHacker1/Found.it/blob/main/found.it%20demo.gif
 
-> **Note:** To add your demo video, upload it to GitHub:
-> 1. Go to any GitHub issue or PR on your repo
-> 2. Drag and drop your video file (MP4, MOV, etc.)
-> 3. GitHub will upload it and give you a URL like the one above
-> 4. Copy that URL and replace it here
->
-> You can also use YouTube by replacing the section above with:
-> ```markdown
-> [![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
-> ```
 
 ## What Makes It Cool
 
