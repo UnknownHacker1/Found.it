@@ -19,6 +19,13 @@ class FileIndexer:
     """Indexes files and extracts their content"""
 
     def __init__(self, index_file: str = "file_index.json"):
+        # Use user's AppData directory for writable storage
+        import os
+        if not os.path.isabs(index_file):
+            app_data = os.path.expanduser("~/.foundit")
+            os.makedirs(app_data, exist_ok=True)
+            index_file = os.path.join(app_data, index_file)
+
         self.index_file = Path(index_file)
         self.parser = DocumentParser()
         self.documents = []

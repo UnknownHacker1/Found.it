@@ -208,10 +208,10 @@ class OpenRouterProvider(LLMProvider):
                     "model": self.model,
                     "messages": messages,
                     "max_tokens": max_tokens,
-                    "temperature": 0.7,
+                    "temperature": 0.3,  # Lower temperature for faster, more focused responses
                     "top_p": 0.9
                 },
-                timeout=90
+                timeout=10  # Faster timeout for query expansion (10 seconds max)
             )
 
             if response.status_code == 200:

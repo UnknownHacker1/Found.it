@@ -38,6 +38,12 @@ indexer = FileIndexer()
 search_engine = SearchEngine()
 rag_engine = None  # Will be initialized after model loads
 
+# Load existing documents into search engine if available
+if indexer.get_documents():
+    logger.info(f"Loading {len(indexer.get_documents())} documents into search engine...")
+    search_engine.build_index(indexer.get_documents())
+    logger.info("Search engine ready with existing index")
+
 
 class IndexRequest(BaseModel):
     path: str
@@ -235,9 +241,19 @@ async def index_files(request: IndexRequest):
     global indexing_progress
 
     try:
+        if not request.path:
+            raise HTTPException(status_code=400, detail="No path provided")
+
+        logger.info(f"Received indexing request for path: {request.path}")
+        logger.info(f"Path type: {type(request.path)}")
+        logger.info(f"Path repr: {repr(request.path)}")
+
         path = Path(request.path)
+        logger.info(f"Path object created: {path}")
+        logger.info(f"Path exists: {path.exists()}")
+
         if not path.exists():
-            raise HTTPException(status_code=400, detail="Path does not exist")
+            raise HTTPException(status_code=400, detail=f"Path does not exist: {request.path}")
 
         # Reset progress
         indexing_progress = {
@@ -518,6 +534,7 @@ def initialize_models():
     # Initialize RAG engine with LLM
     print("Initializing RAG engine...")
     print(f"OpenRouter API key present: {bool(config.OPENROUTER_API_KEY)}")
+    llm_provider = None
     try:
         # Try to use OpenRouter if API key is set
         if config.OPENROUTER_API_KEY:
@@ -530,6 +547,8 @@ def initialize_models():
             # Test if provider is available
             if llm_provider.is_available():
                 print("[OK] OpenRouter provider initialized")
+                # Give LLM to search engine for intelligent query expansion
+                search_engine.llm_provider = llm_provider
             else:
                 print("[ERROR] OpenRouter provider not available (check API key)")
 

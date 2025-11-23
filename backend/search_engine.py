@@ -35,7 +35,7 @@ class SearchEngine:
     Converts text to embeddings and finds similar documents
     """
 
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
+    def __init__(self, model_name: str = 'all-MiniLM-L6-v2', llm_provider=None):
         """
         Initialize search engine with AI model
 
@@ -50,6 +50,8 @@ class SearchEngine:
         self.index = None
         self.documents = []
         self.embeddings = None
+        self.llm_provider = llm_provider  # Optional LLM for intelligent query expansion
+        self.expansion_cache = {}  # Cache AI expansions for speed
 
         if not TRANSFORMERS_AVAILABLE:
             logger.error("sentence-transformers not installed!")
@@ -94,13 +96,21 @@ class SearchEngine:
         self.documents = documents
 
         # Create enriched text for better semantic understanding
-        # Combine filename, file type, and content
+        # Combine filename, file type, content, AND document type classification
         texts = []
         for doc in documents:
-            # Build enriched text: filename + file type + content
-            enriched = f"Filename: {doc['file_name']}. "
-            enriched += f"Type: {doc['file_type']}. "
+            # Classify document type based on content
+            doc_type = self._classify_document_type(doc['content'], doc['file_name'])
+
+            # Build RICH enriched text with document type semantics
+            enriched = f"Document Type: {doc_type}. "
+            enriched += f"Filename: {doc['file_name']}. "
+            enriched += f"File Format: {doc['file_type']}. "
             enriched += f"Content: {doc['content']}"
+
+            # Store document type in metadata for later use
+            doc['document_type'] = doc_type
+
             texts.append(enriched)
 
         # Generate embeddings
@@ -126,16 +136,27 @@ class SearchEngine:
 
         logger.info(f"Index built! Ready to search {len(documents)} documents")
 
-    def search(self, query: str, top_k: int = 10) -> List[Dict]:
+    def search(self, query: str, top_k: int = 10, use_ai_expansion: bool = False) -> List[Dict]:
         """
         Search for documents similar to the query
-        Uses AI to understand semantic meaning with query expansion
+        Uses AI to understand semantic meaning with intelligent query expansion
+
+        Args:
+            query: User's search query
+            top_k: Number of results to return
+            use_ai_expansion: If True, uses AI to expand query (slower but smarter)
+                             If False, uses fast fallback expansion (default for speed)
         """
         if self.index is None or self.model is None:
             raise ValueError("Index not built. Call build_index() first")
 
-        # Expand query with related terms for better matching
-        expanded_query = self._expand_query(query)
+        # SPEED OPTIMIZATION: Skip AI expansion by default, use fast fallback
+        # AI expansion adds 1-2 seconds, fallback is instant
+        if use_ai_expansion:
+            expanded_query = self._expand_query_with_ai(query)
+        else:
+            # Use fast fallback for instant results
+            expanded_query = self._expand_query_fallback(query)
 
         # Generate query embedding using expanded query
         query_embedding = self.model.encode([expanded_query])
@@ -147,7 +168,7 @@ class SearchEngine:
         search_k = min(top_k * 3, len(self.documents))
         scores, indices = self.index.search(query_embedding, search_k)
 
-        # Prepare results with hybrid scoring
+        # Prepare results with ENHANCED hybrid scoring
         results = []
         query_lower = query.lower()
         query_terms = set(query_lower.split())
@@ -170,12 +191,42 @@ class SearchEngine:
                 elif any(term in filename_lower for term in query_terms):
                     filename_boost = 0.15
 
-                # Combined hybrid score
-                final_score = min(1.0, semantic_score + filename_boost)
+                # NEW: Document type matching boost - CRITICAL for intent understanding
+                doc_type_boost = 0.0
+                doc_type = doc.get('document_type', '').lower()
+
+                # Strong boost if document type matches query intent
+                if 'resume' in query_lower or 'cv' in query_lower:
+                    if 'resume' in doc_type or 'curriculum vitae' in doc_type or 'professional profile' in doc_type:
+                        doc_type_boost = 0.4  # Strong boost for resume queries matching resume documents
+                    elif 'transcript' in doc_type or 'tax' in doc_type or 'immigration' in doc_type:
+                        doc_type_boost = -0.3  # Penalize clearly wrong document types
+
+                elif 'transcript' in query_lower or 'grade' in query_lower:
+                    if 'transcript' in doc_type:
+                        doc_type_boost = 0.4
+                    elif 'resume' in doc_type:
+                        doc_type_boost = -0.2
+
+                elif 'travel' in query_lower or 'passport' in query_lower or 'visa' in query_lower:
+                    if 'immigration' in doc_type or 'passport' in doc_type or 'travel' in doc_type:
+                        doc_type_boost = 0.4
+                    elif 'resume' in doc_type or 'tax' in doc_type:
+                        doc_type_boost = -0.2
+
+                elif 'homework' in query_lower or 'assignment' in query_lower or 'math' in query_lower or 'calculus' in query_lower:
+                    if 'homework' in doc_type or 'assignment' in doc_type or 'math' in doc_type or 'calculus' in doc_type:
+                        doc_type_boost = 0.4
+                    elif 'resume' in doc_type or 'tax' in doc_type or 'immigration' in doc_type:
+                        doc_type_boost = -0.2
+
+                # Combined hybrid score with document type intelligence
+                final_score = max(0.0, min(1.0, semantic_score + filename_boost + doc_type_boost))
 
                 doc['score'] = final_score
                 doc['semantic_score'] = semantic_score
                 doc['filename_boost'] = filename_boost
+                doc['doc_type_boost'] = doc_type_boost
 
                 # Don't include full content in results (too large)
                 doc.pop('content', None)
@@ -185,40 +236,175 @@ class SearchEngine:
         results.sort(key=lambda x: x['score'], reverse=True)
         return results[:top_k]
 
-    def _expand_query(self, query: str) -> str:
+    def _classify_document_type(self, content: str, filename: str) -> str:
         """
-        Expand query with related terms for better semantic matching
+        Classify document type based on content patterns for better semantic understanding
+        This helps the embeddings understand what KIND of document it is
+        """
+        content_lower = content.lower()
+        filename_lower = filename.lower()
+
+        # Resume/CV detection - look for career-related patterns
+        resume_indicators = [
+            'education', 'work experience', 'skills', 'professional experience',
+            'employment history', 'curriculum vitae', 'linkedin', 'github',
+            'bachelor', 'master', 'university', 'degree', 'gpa',
+            'projects', 'certifications', 'references'
+        ]
+        resume_score = sum(1 for indicator in resume_indicators if indicator in content_lower)
+
+        # Check for resume structure (contact info + education + experience)
+        has_contact = any(x in content_lower for x in ['email', 'phone', '@', 'linkedin', 'github'])
+        has_education = any(x in content_lower for x in ['education', 'university', 'bachelor', 'master', 'degree', 'gpa'])
+        has_experience = any(x in content_lower for x in ['experience', 'work', 'employment', 'skills', 'projects'])
+
+        if (resume_score >= 3) or (has_contact and has_education and has_experience):
+            return "Resume CV Curriculum Vitae Professional Profile Career Document"
+
+        # Cover letter detection
+        if any(x in content_lower for x in ['dear hiring', 'i am writing to apply', 'cover letter', 'sincerely', 'application for']):
+            return "Cover Letter Job Application"
+
+        # Academic transcript detection
+        if any(x in content_lower for x in ['transcript', 'course', 'grade', 'credit hours', 'semester', 'gpa']) and \
+           any(x in content_lower for x in ['official', 'university', 'college', 'registrar']):
+            return "Academic Transcript Grade Report Educational Record"
+
+        # Immigration/Travel documents
+        if any(x in content_lower for x in ['i-20', 'i20', 'sevis', 'homeland security', 'nonimmigrant student']):
+            return "Immigration Document I-20 Student Visa Travel Authorization"
+
+        if any(x in content_lower for x in ['i-94', 'i94', 'arrival', 'departure', 'admission number']):
+            return "Immigration Document I-94 Travel Record Arrival Departure"
+
+        if any(x in content_lower for x in ['passport', 'nationality', 'passport number', 'place of birth']):
+            return "Passport Travel Document Identification"
+
+        # Tax documents
+        if any(x in content_lower for x in ['w-2', 'w2', 'wage and tax', 'employer identification', 'social security']) and \
+           any(x in content_lower for x in ['wages', 'federal', 'income tax']):
+            return "Tax Document W-2 Form Wage Statement"
+
+        # Financial documents
+        if any(x in content_lower for x in ['budget', 'expenses', 'revenue', 'financial report', 'quarterly']):
+            return "Financial Document Budget Report Expense Revenue"
+
+        if any(x in content_lower for x in ['invoice', 'payment', 'bill', 'amount due']):
+            return "Invoice Bill Payment Receipt"
+
+        # Meeting notes/workflow
+        if any(x in content_lower for x in ['meeting minutes', 'agenda', 'action items', 'attendees']):
+            return "Meeting Notes Minutes Documentation"
+
+        if any(x in content_lower for x in ['workflow', 'process', 'procedure', 'steps']):
+            return "Workflow Document Process Guide Procedure"
+
+        # Academic/homework - check for calculus/math homework patterns
+        if any(x in content_lower for x in ['homework', 'assignment', 'problem set', 'due date', 'calculus', 'derivative', 'integral', 'solve for', 'find the value', 'exercise']) or \
+           'hw' in filename_lower or 'homework' in filename_lower or 'not_hw' in filename_lower:
+            # Additional check for math/calculus content
+            math_indicators = ['∫', 'derivative', 'integral', 'calculus', 'equation', 'solve', 'find x', 'problem']
+            if any(indicator in content_lower for indicator in math_indicators):
+                return "Academic Assignment Homework Problem Set Math Calculus Exercise"
+            return "Academic Assignment Homework Problem Set"
+
+        # Lab reports
+        if any(x in content_lower for x in ['lab report', 'experiment', 'procedure', 'results', 'conclusion', 'hypothesis']):
+            return "Lab Report Scientific Experiment Academic"
+
+        # Default: Generic document
+        return "General Document File"
+
+    def _expand_query_with_ai(self, query: str) -> str:
+        """
+        Use AI (LLM) to intelligently expand the query with semantic alternatives
+        OPTIMIZED for speed with caching and shorter prompts
+        """
+        # Check cache first - HUGE speed improvement!
+        cache_key = query.lower().strip()
+        if cache_key in self.expansion_cache:
+            logger.info(f"Using cached expansion for: '{query}'")
+            return self.expansion_cache[cache_key]
+
+        if not self.llm_provider or not self.llm_provider.is_available():
+            # Fallback to basic expansion if LLM unavailable
+            return self._expand_query_fallback(query)
+
+        try:
+            # OPTIMIZED: Much shorter prompt for faster response
+            prompt = f"""Expand this search query with synonyms and related terms (keywords only):
+
+Query: "{query}"
+
+Examples:
+"resume" → resume CV curriculum vitae employment work experience education
+"homework" → homework assignment problem set exercise
+"travel docs" → travel passport visa immigration i94
+
+Output (keywords):"""
+
+            # Get AI expansion with REDUCED tokens for speed
+            expanded_terms = self.llm_provider.generate(prompt, max_tokens=50)
+            expanded_terms = expanded_terms.strip()
+
+            # Clean up the response
+            expanded_terms = expanded_terms.replace('\n', ' ').replace('  ', ' ')
+
+            # Combine original query with AI-generated terms
+            final_query = f"{query} {expanded_terms}"
+
+            # Cache the result for future use
+            self.expansion_cache[cache_key] = final_query
+
+            logger.info(f"AI-expanded: '{query}' -> '{expanded_terms[:50]}...'")
+            return final_query
+
+        except Exception as e:
+            logger.warning(f"AI expansion failed: {e}. Using fallback.")
+            return self._expand_query_fallback(query)
+
+    def _expand_query_fallback(self, query: str) -> str:
+        """
+        Fast fallback query expansion - instant results
+        Uses smart keyword matching for common document types
         """
         query_lower = query.lower()
 
-        # Define domain-specific expansions
-        expansions = {
-            'travel': 'travel passport visa immigration i94 i-94 flight ticket boarding',
-            'travel documents': 'passport visa i94 i-94 immigration travel authorization boarding pass flight ticket',
-            'passport': 'passport travel document identification visa',
-            'visa': 'visa immigration travel authorization permit',
-            'i94': 'i94 i-94 immigration arrival departure form travel',
-            'flight': 'flight ticket boarding pass airline travel itinerary',
-            'math': 'math mathematics calculus algebra geometry arithmetic equations',
-            'homework': 'homework assignment problem set exercises coursework',
-            'code': 'code programming source script implementation function',
-            'python': 'python programming code script .py development',
-            'java': 'java programming code class .java development',
-            'meeting': 'meeting notes minutes discussion agenda action items',
-            'budget': 'budget financial expenses costs spending money',
-            'invoice': 'invoice bill receipt payment transaction',
-            'contract': 'contract agreement legal document terms',
-            'resume': 'resume cv curriculum vitae employment job career',
+        # Comprehensive but instant expansions for common queries
+        fast_expansions = {
+            # Career documents
+            'resume': 'resume CV curriculum vitae professional profile employment work experience education skills',
+            'cv': 'CV resume curriculum vitae professional profile employment work experience education',
+
+            # Academic
+            'homework': 'homework assignment problem set exercise math calculus',
+            'assignment': 'assignment homework problem set exercise',
+            'math': 'math mathematics calculus algebra geometry homework',
+            'calculus': 'calculus math mathematics derivative integral homework',
+
+            # Travel/Immigration
+            'travel': 'travel passport visa immigration i94 i-94',
+            'passport': 'passport travel visa immigration',
+            'visa': 'visa passport travel immigration',
+            'i94': 'i94 i-94 immigration travel arrival departure',
+
+            # Financial
+            'tax': 'tax w-2 w2 form income federal IRS',
+            'budget': 'budget financial expenses revenue costs',
+            'invoice': 'invoice bill receipt payment',
+
+            # Academic records
+            'transcript': 'transcript grades academic course gpa',
+            'grade': 'grade transcript academic course gpa',
         }
 
-        # Check if query matches any expansion categories
-        expanded = query
-        for key, expansion in expansions.items():
+        # Apply expansion for matching keywords
+        for key, expansion in fast_expansions.items():
             if key in query_lower:
-                expanded = f"{query} {expansion}"
-                break
+                return f"{query} {expansion}"
 
-        return expanded
+        # No expansion needed
+        return query
 
     def is_ready(self) -> bool:
         """Check if search engine is ready"""

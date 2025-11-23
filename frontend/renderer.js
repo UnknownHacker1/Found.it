@@ -77,7 +77,7 @@ async function updateIndexStatus() {
         const status = await ipcRenderer.invoke('get-status');
         const count = status.indexed_files || 0;
         if (count > 0) {
-            indexStatus.textContent = `${count} files indexed`;
+            indexStatus.textContent = 'Files indexed';
         } else {
             indexStatus.textContent = 'No files indexed';
         }
@@ -132,7 +132,7 @@ async function indexFiles(path) {
         const result = await ipcRenderer.invoke('index-files', path, false);
 
         progressText.textContent = 'Indexing complete!';
-        progressStats.textContent = `${result.files_indexed} files indexed (${result.skipped} skipped, ${result.total_files} total)`;
+        progressStats.textContent = 'Your files are ready to search';
         progressFill.style.width = '100%';
 
         await updateIndexStatus();

@@ -348,7 +348,7 @@ async function updateStatus() {
         // Index status
         const count = status.indexed_files || 0;
         if (count > 0) {
-            indexStatus.textContent = `${count} files indexed`;
+            indexStatus.textContent = 'Files indexed';
         } else {
             indexStatus.textContent = 'No files indexed';
         }

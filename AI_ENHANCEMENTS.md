@@ -1,9 +1,7 @@
-# AI Logic Enhancements - Foundit
+# AI Logic Enhancements
 
 ## Overview
-Enhanced the RAG engine to provide ChatGPT-like conversational AI with intelligent intent classification and natural responses.
-
----
+Enhanced the RAG (Retrieval-Augmented Generation) engine to provide ChatGPT-like conversational AI with intelligent intent classification and natural language responses.
 
 ## 🎯 Key Improvements
 
@@ -33,8 +31,6 @@ The AI now intelligently differentiates between:
 - Expanded keyword detection (30+ search keywords, 25+ file types)
 - Context-aware: knows when you're referencing files from previous searches
 - Smarter decisions: differentiates "find my resume" (search) vs "summarize my resume" (analysis)
-
----
 
 ### 2. **Conversational AI Personality**
 
@@ -69,8 +65,6 @@ AI: "I found exactly what you're looking for! This appears to be your profession
      📄 Professional_CV_2024.pdf"
 ```
 
----
-
 ### 3. **Context Memory & Follow-ups**
 
 The AI remembers your conversation:
@@ -92,8 +86,6 @@ AI: "I'll analyze 2023_Tax_Return.pdf for you...
      ..."
 ```
 
----
-
 ### 4. **Smarter File Recognition**
 
 **Synonym Mapping:**
@@ -109,8 +101,6 @@ AI: *Finds "Professional_Resume_2024.pdf" even though it doesn't say "CV"*
 You: "where are my immigration papers"
 AI: *Finds passport, visa, i94 forms automatically*
 ```
-
----
 
 ### 5. **Enhanced Response Formatting**
 
@@ -129,8 +119,6 @@ work history documents.
 1. 📄 resume.pdf
 2. 📄 CV_final.docx
 ```
-
----
 
 ## 🚀 User Experience Improvements
 
@@ -158,8 +146,6 @@ I couldn't find any files that match your request. Try:
 • Using different keywords
 • Rephrasing your search
 ```
-
----
 
 ## 🧠 Technical Details
 
@@ -189,8 +175,6 @@ The AI uses a comprehensive system prompt that defines:
 - Capabilities (file search, analysis, conversation)
 - Response guidelines (clear, concise, well-formatted)
 
----
-
 ## 📊 Performance
 
 **Efficiency maintained:**
@@ -204,8 +188,6 @@ The AI uses a comprehensive system prompt that defines:
 - More natural and helpful responses
 - Reduced user frustration (clearer error messages)
 - Higher user engagement (conversational)
-
----
 
 ## 🎨 Examples of Enhanced Interactions
 
@@ -262,8 +244,6 @@ AI: "I'm specialized in file search and don't have access to weather data.
      for anything like that?"
 ```
 
----
-
 ## 💡 Future Enhancement Ideas
 
 ### Potential Additions (for future):
@@ -273,8 +253,6 @@ AI: "I'm specialized in file search and don't have access to weather data.
 4. **Categories**: Auto-categorize files (Work, Personal, Travel, etc.)
 5. **Time-based Search**: "show me files from last week"
 6. **Advanced Queries**: "find PDFs larger than 5MB about taxes"
-
----
 
 ## 📝 Summary
 

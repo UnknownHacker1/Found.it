@@ -5,7 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "build": "electron-builder build --win --publish never",
+    "build:dir": "electron-builder build --win --dir"
   },
   "keywords": [
     "electron",
@@ -15,11 +17,52 @@
   ],
   "author": "",
   "license": "MIT",
+  "build": {
+    "appId": "com.foundit.app",
+    "productName": "Foundit",
+    "electronVersion": "28.0.0",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/dist/**",
+          "!**/build/**",
+          "!**/*.spec"
+        ]
+      }
+    ]
+  },
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "axios": "^1.6.0"
   }
 }
-
