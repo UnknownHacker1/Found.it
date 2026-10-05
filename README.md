@@ -1,6 +1,6 @@
 # Foundit - Your AI File Search Assistant
 
-Ever spent 10 minutes looking for that one document you know you saved somewhere? Yeah, we've all been there. That's why I built Foundit.
+Ever spent 10 minutes looking for that one document you know you saved somewhere? Yeah, we've all been there. That's why we built Foundit.
 
 Instead of remembering exact file names, just ask naturally: "find my resume" or "where's my passport?" The AI actually understands what you're looking for and finds it. Pretty neat, right?
 
@@ -13,7 +13,7 @@ Instead of remembering exact file names, just ask naturally: "find my resume" or
 - **Talk Like a Human** - No more keyword hunting. Just ask "show me my tax stuff from 2023" and it gets it.
 - **Actually Smart** - Knows that "resume" and "CV" are the same thing. Finds your passport when you ask for "travel documents."
 - **Lightning Fast** - Results in under 100ms. No waiting around.
-- **100% Private** - Everything runs on your computer. Your files never leave your machine.
+- **Private Search** - Indexing and search run entirely on your computer, so your files are never uploaded to be searched.
 - **Ridiculously Easy** - If you can chat with ChatGPT, you can use Foundit.
 
 ## Getting Started
@@ -207,7 +207,7 @@ Built with:
 - **Python FastAPI** - The backend server
 - **Sentence Transformers** - The AI that understands meaning
 - **FAISS** - Crazy fast vector search (thanks Facebook)
-- **OpenRouter** - For the conversational AI part
+- **OpenRouter or Ollama** - For the conversational AI part (OpenRouter by default, or a local Ollama model if you want everything offline)
 
 It's basically ChatGPT + Google, but just for your files.
 
@@ -234,7 +234,11 @@ Stuff I'm working on:
 
 ## One More Thing
 
-Your files are **yours**. Nothing gets uploaded. Nothing gets sent to the cloud. Everything happens on your computer. I built this because I was tired of cloud services indexing my personal documents. Your privacy matters.
+Your files are **yours**. Indexing and search happen entirely on your computer, so nothing gets uploaded to be searched. The chat and summary features do send the relevant text to an LLM: OpenRouter by default, or a local Ollama model if you'd rather keep everything offline. We built this because we were tired of cloud services indexing our personal documents. Your privacy matters.
+
+## Team
+
+Foundit was a finalist at USM's Hatchathon in November 2025. We built it together as a team of three: [Abdelrahman Teima](https://github.com/UnknownHacker1), [Hossam Darwish](https://github.com/Hossam-Ismail) and [Riad Benyamna](https://github.com/Riad-Benyamna). Most of it was written side by side on one shared laptop, which is why most of the commits come from one account.
 
 ## License
 
@@ -248,4 +252,4 @@ MIT License - do whatever you want with it.
 
 ---
 
-Made by someone who was tired of losing files. Hope it helps you too.
+Made by three people who were tired of losing files. Hope it helps you too.
