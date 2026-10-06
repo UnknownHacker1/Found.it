@@ -105,3 +105,4 @@ dist/
 
 # Windows batch files (local dev)
 *.bat
+.venv/

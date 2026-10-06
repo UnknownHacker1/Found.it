@@ -1,0 +1,7 @@
+# Optional: GPU search on NVIDIA cards (see "GPU Search" in the README).
+# Also needs a CUDA build of PyTorch, for example:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+# No CUDA toolkit needed, just the normal NVIDIA driver.
+cupy-cuda12x
+nvidia-cuda-nvrtc-cu12
+nvidia-cuda-runtime-cu12

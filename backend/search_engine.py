@@ -25,6 +25,15 @@ try:
 except ImportError:
     FAISS_AVAILABLE = False
 
+# Optional GPU search (needs an NVIDIA GPU and CuPy); falls back to FAISS on the CPU
+try:
+    from gpu_search import GpuFlatIP, gpu_available
+except ImportError:
+    GpuFlatIP = None
+
+    def gpu_available():
+        return False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -48,6 +57,7 @@ class SearchEngine:
         self.model_name = model_name
         self.model = None
         self.index = None
+        self.gpu_index = None  # same search on the GPU when one is available
         self.documents = []
         self.embeddings = None
         self.llm_provider = llm_provider  # Optional LLM for intelligent query expansion
@@ -73,6 +83,17 @@ class SearchEngine:
             self.model = SentenceTransformer(self.model_name)
 
             logger.info("Model loaded successfully!")
+
+    def _init_gpu_index(self):
+        """Copy the normalized embeddings to the GPU if there is one. Set FOUNDIT_GPU=0 to turn it off."""
+        self.gpu_index = None
+        if self.embeddings is None or os.getenv('FOUNDIT_GPU', '1') == '0' or not gpu_available():
+            return
+        try:
+            self.gpu_index = GpuFlatIP(self.embeddings)
+            logger.info(f"GPU search enabled on {self.gpu_index.device_name}")
+        except Exception as e:
+            logger.warning(f"GPU search unavailable ({e}), using FAISS on the CPU")
 
     def build_index(self, documents: List[Dict]):
         """
@@ -133,6 +154,7 @@ class SearchEngine:
 
         # Add to index
         self.index.add(self.embeddings)
+        self._init_gpu_index()
 
         logger.info(f"Index built! Ready to search {len(documents)} documents")
 
@@ -166,7 +188,15 @@ class SearchEngine:
 
         # Search for more results than needed (we'll re-rank)
         search_k = min(top_k * 3, len(self.documents))
-        scores, indices = self.index.search(query_embedding, search_k)
+        if self.gpu_index is not None:
+            try:
+                scores, indices = self.gpu_index.search(query_embedding, search_k)
+            except Exception as e:
+                logger.warning(f"GPU search failed ({e}), switching to FAISS on the CPU")
+                self.gpu_index = None
+                scores, indices = self.index.search(query_embedding, search_k)
+        else:
+            scores, indices = self.index.search(query_embedding, search_k)
 
         # Prepare results with ENHANCED hybrid scoring
         results = []
@@ -413,6 +443,7 @@ Output (keywords):"""
     def clear(self):
         """Clear the index"""
         self.index = None
+        self.gpu_index = None
         self.documents = []
         self.embeddings = None
         logger.info("Search index cleared")
@@ -511,6 +542,7 @@ Output (keywords):"""
 
             # Load embeddings
             self.embeddings = np.load(emb_file)
+            self._init_gpu_index()
 
             # Load metadata if exists
             if meta_file.exists():

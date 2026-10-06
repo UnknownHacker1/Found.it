@@ -1,0 +1,38 @@
+{
+  "info": {
+    "gpu": "NVIDIA GeForce GTX 1650",
+    "faiss_threads": 8,
+    "peak_bandwidth_gbs": 192.032,
+    "copy_bandwidth_gbs": 174.5935310358479
+  },
+  "rows": [
+    {
+      "n": 100000,
+      "faiss_cpu_ms": 5.469000025186688,
+      "faiss_cpu_batch_ms_per_query": 4.027456256153528,
+      "gpu_search_ms": 0.8418500074185431,
+      "gpu_batch_ms_per_query": 0.36490000638877973,
+      "scoring_only_ms": 0.45070400834083557,
+      "achieved_gbs": 170.4000820465781,
+      "recall_at_k": 0.9993333333333333,
+      "max_score_error": 3.886222839355469e-05,
+      "torch_fp32_ms": 1.1483000125735998,
+      "torch_fp16_ms": 4.0279499953612685,
+      "speedup_vs_faiss_cpu": 6.4964066959586795
+    },
+    {
+      "n": 1000000,
+      "faiss_cpu_ms": 50.87484995601699,
+      "faiss_cpu_batch_ms_per_query": 42.36892499466194,
+      "gpu_search_ms": 5.625899997539818,
+      "gpu_batch_ms_per_query": 2.5242374977096915,
+      "scoring_only_ms": 4.3888161182403564,
+      "achieved_gbs": 174.990243224845,
+      "recall_at_k": 1.0,
+      "max_score_error": 4.056096076965332e-05,
+      "torch_fp32_ms": 9.15094994707033,
+      "torch_fp16_ms": 36.52725002029911,
+      "speedup_vs_faiss_cpu": 9.04297089856989
+    }
+  ]
+}

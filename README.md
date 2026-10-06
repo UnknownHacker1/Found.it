@@ -208,8 +208,37 @@ Built with:
 - **Sentence Transformers** - The AI that understands meaning
 - **FAISS** - Crazy fast vector search (thanks Facebook)
 - **OpenRouter or Ollama** - For the conversational AI part (OpenRouter by default, or a local Ollama model if you want everything offline)
+- **CUDA (through CuPy)** - Optional GPU search on NVIDIA cards (see below)
 
 It's basically ChatGPT + Google, but just for your files.
+
+## GPU Search (NVIDIA Cards)
+
+If your computer has an NVIDIA graphics card, Foundit can run the search on it.
+
+Foundit finds files with an exact similarity search across every file's embedding (FAISS `IndexFlatIP`). FAISS has no GPU build for Windows, so the GPU path is a small CUDA C++ kernel of its own in [`backend/gpu_search.py`](backend/gpu_search.py). CuPy compiles it on the fly with NVIDIA's NVRTC, so you only need the normal NVIDIA driver, not the CUDA toolkit.
+
+How it gets its speed:
+- Search is limited by memory, not math. Every query has to read the whole table of embeddings once, so the table lives on the GPU in fp16, half the bytes of fp32. The kernel still adds everything up in fp32.
+- Each group of 16 GPU threads reads one row with 16-byte loads, so every read is fully coalesced.
+- Up to 8 queries share one pass over memory.
+
+Numbers on a laptop GTX 1650 (4 GB) against FAISS on the same laptop's 8-thread Intel i5-11320H, 384-dimension embeddings, top 30:
+
+| Files (vectors) | FAISS on the CPU | Foundit on the GPU | Speedup |
+|---|---|---|---|
+| 100,000 | 5.47 ms | 0.84 ms | 6.5x |
+| 1,000,000 | 50.87 ms | 5.63 ms | 9.0x |
+
+At 1M vectors the kernel reads memory at 175 GB/s, 91% of the card's 192 GB/s peak, and returns the same top 30 as FAISS (recall 1.0). With batches of 8 queries it's 17x faster than FAISS per query. For comparison, the fastest plain PyTorch version took 9.15 ms per query on the same GPU. Full results are in [`benchmarks/results.json`](benchmarks/results.json).
+
+To turn it on:
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu126
+pip install -r backend/requirements-gpu.txt
+```
+
+Foundit uses the GPU automatically when it finds one and falls back to FAISS when it doesn't. Set `FOUNDIT_GPU=0` to force the CPU. To check it on your machine, run `python backend/test_gpu_search.py` (results match FAISS) and `python benchmarks/gpu_search_bench.py` (speed).
 
 ## Want to Help?
 
